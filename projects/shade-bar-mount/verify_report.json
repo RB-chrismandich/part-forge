@@ -1,0 +1,793 @@
+{
+  "ShadeBarSaddle": {
+    "params": {
+      "D_BAR": 19.05,
+      "H_DROP": 2.0,
+      "W_PLATE": 76.2,
+      "H_PLATE": 44.45,
+      "T_PLATE": 5.5,
+      "T_WALL": 3.0,
+      "CLEAR": 0.4,
+      "GAP": 1.0,
+      "W_SADDLE": 25.0,
+      "WRAP_DEG": 170.0
+    },
+    "counts": {
+      "verts": 13346,
+      "edges": 40032,
+      "faces": 26688,
+      "tris": 26688
+    },
+    "mesh": {
+      "non_manifold_edges": 0,
+      "boundary_edges": 0,
+      "loose_verts": 0,
+      "loose_edges": 0,
+      "shells": 1,
+      "min_edge_len": 0.0050587416626513,
+      "degenerate_faces": 0,
+      "euler": 2,
+      "topo_non_manifold_edges": 0,
+      "topo_boundary_edges": 0,
+      "topo_shells": 1,
+      "folded_faces": 107,
+      "folded_in_collar": 16
+    },
+    "purge": {
+      "triangles": 26688,
+      "components": 1,
+      "dropped_components": 0,
+      "dropped_faces": 0,
+      "volume": 32953.02959417961,
+      "volume_dropped": 0.0,
+      "triangles_kept": 26688,
+      "euler": 2,
+      "non_manifold": 0
+    },
+    "tape": {
+      "width": 76.19999694824219,
+      "height": 44.45000076293945,
+      "z_min": 0.0,
+      "max_abs_y": 0.0,
+      "faces": 101,
+      "area_mm2": 3351.1064974069595,
+      "area_in2": 5.194225459431706
+    },
+    "bbox": {
+      "x": [
+        -38.099998474121094,
+        38.099998474121094
+      ],
+      "y": [
+        0.0,
+        45.347537994384766
+      ],
+      "z": [
+        -5.699999809265137,
+        44.45000076293945
+      ]
+    },
+    "plate_height": 44.45000076293945,
+    "trough": {
+      "z_rest_measured": -1.999969482421875,
+      "z_rest_expected": -2.0,
+      "fit_y": 31.74999974638843,
+      "fit_z": 7.924811570884338,
+      "fit_r": 9.92526511102586,
+      "y_axis_expected": 31.75,
+      "z_axis_expected": 7.925000000000001,
+      "r_expected": 9.925,
+      "samples": 79
+    },
+    "wall": {
+      "min_mm": 3.499997552608517,
+      "at_phi_deg": 71.25949256621436,
+      "required": 3.0,
+      "samples": 362,
+      "swept_deg": 176.86340078377887,
+      "min_land": 3.69999868532483,
+      "land_phi": 28.140105707957364,
+      "min_groove": 3.499997552608517,
+      "groove_phi": 71.25949256621436,
+      "groove_x": 0.5000000000000042,
+      "groove_samples": 181
+    },
+    "fillet": {
+      "upper": {
+        "r_built": 13.5,
+        "r_requested": 13.5,
+        "fit_r": 13.498591346528668,
+        "fit_c_err": 0.006855006869205205,
+        "c_y": 20.19867314080784,
+        "c_z": 23.398136240947082,
+        "corner_y": 6.742019132082917,
+        "r_min": 13.487873989290401,
+        "r_max": 13.500000883031746,
+        "rays": 61,
+        "theta": 100.68962594492899,
+        "t1": [
+          6.739056885661748,
+          22.354713860409362
+        ],
+        "t2": [
+          18.727381674867267,
+          9.978549756176008
+        ],
+        "cap": 17.744897448014157
+      },
+      "lower": {
+        "r_built": 5.0,
+        "r_requested": 5.0,
+        "fit_r": 5.001372644612361,
+        "fit_c_err": 0.002510897606868729,
+        "c_y": 2.86578078988861,
+        "c_z": -5.0,
+        "corner_y": 5.602698373193698,
+        "r_min": 4.9983289787338805,
+        "r_max": 5.000000715255686,
+        "rays": 61,
+        "theta": 131.6335393386024,
+        "t1": [
+          2.86578078988861,
+          0.0
+        ],
+        "t2": [
+          6.602827383189089,
+          -1.6781808057178547
+        ],
+        "cap": 5.21397931032653
+      }
+    },
+    "ribs": {
+      "planned": 24,
+      "pitch": 1.0,
+      "width": 0.4,
+      "depth": 0.2,
+      "layer": 0.2,
+      "x_limit": 12.5,
+      "found": 24,
+      "depth_meas": 0.19999980926513672,
+      "width_meas": 0.3999998668829614,
+      "pitch_meas": 1.0,
+      "layer_err": 6.675627162167075e-07,
+      "land_r": 9.924999046325684,
+      "edges": 48
+    },
+    "mouth": {
+      "chamfer": 0.8,
+      "wrap_meas_deg": 187.09999999999366,
+      "wrap_full_deg": 177.86340078377887,
+      "wrap_nominal_deg": 170.0,
+      "rim_plus": 87.29999999999718,
+      "rim_minus": 99.79999999999647,
+      "true_plus": 82.74999999999744,
+      "end_plus": 87.0499999999972,
+      "cham_plus": 0.7881688735849446,
+      "true_minus": 95.24999999999673,
+      "end_minus": 99.54999999999649,
+      "cham_minus": 0.7881688735849446
+    },
+    "notch": {
+      "z_left": 42.20001220703125,
+      "z_right": 42.20001220703125,
+      "z_clear": 44.45001220703125,
+      "z_expected": 42.2,
+      "width": 4.0,
+      "depth": 2.5
+    },
+    "bulge": {
+      "z_lo": 3.0,
+      "z_hi": 41.45,
+      "x": 23.5,
+      "face_lo": 7.030008316040039,
+      "face_hi": 5.520705699920654,
+      "expect_lo": 7.0311884049342925,
+      "expect_hi": 5.520246961176516,
+      "amp_lo": 2.467373824235952,
+      "amp_hi": 0.032626175764047805
+    },
+    "root_void_scan": {
+      "stations": 61,
+      "off_circle": 0,
+      "inside": 0,
+      "open_span": 61,
+      "tested": 0
+    },
+    "moment_arm": 31.75,
+    "back_clear": 22.225,
+    "gap_eff": 14.225,
+    "projection": 45.347537994384766,
+    "print_overhang_mm2": 9.821160509764155,
+    "print_overhang_at_x": 16.9,
+    "drop_in": {
+      "min_clearance": 0.39996948242187536,
+      "at_y": 31.75,
+      "r_root": 13.5
+    },
+    "bending": {
+      "sf": 36.48077427315975,
+      "y": 26.51875,
+      "sigma": 1.3705849449798229,
+      "section_h": 4.513709545135498,
+      "area": 112.84273862838745,
+      "S": 84.88989107436376,
+      "load_lbf": 5.0,
+      "sf_required": 8.0
+    },
+    "expect": {
+      "w_plate": 76.2,
+      "h_plate": 44.45,
+      "h_cap": 50.8,
+      "z_rest": -2.0,
+      "y_axis": 31.75,
+      "z_axis": 7.925000000000001,
+      "r_trough": 9.925,
+      "t_wall": 3.0,
+      "z_env_bot": -5.699999999999999
+    }
+  },
+  "saddle_h-2": {
+    "params": {
+      "D_BAR": 19.05,
+      "H_DROP": 0.0,
+      "W_PLATE": 76.2,
+      "H_PLATE": 44.45,
+      "T_PLATE": 5.5,
+      "T_WALL": 3.0,
+      "CLEAR": 0.4,
+      "GAP": 1.0,
+      "W_SADDLE": 25.0,
+      "WRAP_DEG": 170.0
+    },
+    "counts": {
+      "verts": 13105,
+      "edges": 39309,
+      "faces": 26206,
+      "tris": 26206
+    },
+    "mesh": {
+      "non_manifold_edges": 0,
+      "boundary_edges": 0,
+      "loose_verts": 0,
+      "loose_edges": 0,
+      "shells": 1,
+      "min_edge_len": 0.005004129838198423,
+      "degenerate_faces": 0,
+      "euler": 2,
+      "topo_non_manifold_edges": 0,
+      "topo_boundary_edges": 0,
+      "topo_shells": 1,
+      "folded_faces": 133,
+      "folded_in_collar": 22
+    },
+    "purge": {
+      "triangles": 26206,
+      "components": 1,
+      "dropped_components": 0,
+      "dropped_faces": 0,
+      "volume": 33126.01216138986,
+      "volume_dropped": 0.0,
+      "triangles_kept": 26206,
+      "euler": 2,
+      "non_manifold": 0
+    },
+    "tape": {
+      "width": 76.19999694824219,
+      "height": 44.45000076293945,
+      "z_min": 0.0,
+      "max_abs_y": 0.0,
+      "faces": 101,
+      "area_mm2": 3351.1064974069595,
+      "area_in2": 5.194225459431706
+    },
+    "bbox": {
+      "x": [
+        -38.099998474121094,
+        38.099998474121094
+      ],
+      "y": [
+        0.0,
+        45.347537994384766
+      ],
+      "z": [
+        -3.700000047683716,
+        44.45000076293945
+      ]
+    },
+    "plate_height": 44.45000076293945,
+    "trough": {
+      "z_rest_measured": 0.0,
+      "z_rest_expected": -0.0,
+      "fit_y": 31.74999532686839,
+      "fit_z": 9.924810105299574,
+      "fit_r": 9.925262676346033,
+      "y_axis_expected": 31.75,
+      "z_axis_expected": 9.925,
+      "r_expected": 9.925,
+      "samples": 79
+    },
+    "wall": {
+      "min_mm": 3.500000063177507,
+      "at_phi_deg": 0.0,
+      "required": 3.0,
+      "samples": 362,
+      "swept_deg": 169.71340078377926,
+      "min_land": 3.700031735782399,
+      "land_phi": -3.6249999999997744,
+      "min_groove": 3.500000063177507,
+      "groove_phi": 0.0,
+      "groove_x": 0.5000000000000042,
+      "groove_samples": 181
+    },
+    "fillet": {
+      "upper": {
+        "r_built": 13.5,
+        "r_requested": 13.5,
+        "fit_r": 13.498047273162962,
+        "fit_c_err": 0.006857213207324779,
+        "c_y": 20.132117548387715,
+        "c_z": 24.18831994647511,
+        "corner_y": 6.745040557662112,
+        "r_min": 13.487073290193784,
+        "r_max": 13.50000254313127,
+        "rays": 61,
+        "theta": 98.10902460502577,
+        "t1": [
+          6.673285238805528,
+          23.13483389410107
+        ],
+        "t2": [
+          19.2766055013466,
+          10.715454655922862
+        ],
+        "cap": 16.905108580281496
+      },
+      "lower": {
+        "r_built": 5.0,
+        "r_requested": 5.0,
+        "fit_r": 5.001372644612361,
+        "fit_c_err": 0.002510897606868729,
+        "c_y": 2.86578078988861,
+        "c_z": -5.0,
+        "corner_y": 5.602698373193698,
+        "r_min": 4.9983289787338805,
+        "r_max": 5.000000715255686,
+        "rays": 61,
+        "theta": 131.6335393386024,
+        "t1": [
+          2.86578078988861,
+          0.0
+        ],
+        "t2": [
+          6.602827383189089,
+          -1.6781808057178547
+        ],
+        "cap": 5.21397931032653
+      }
+    },
+    "ribs": {
+      "planned": 24,
+      "pitch": 1.0,
+      "width": 0.4,
+      "depth": 0.2,
+      "layer": 0.2,
+      "x_limit": 12.5,
+      "found": 24,
+      "depth_meas": 0.19999980926513672,
+      "width_meas": 0.3999998668829614,
+      "pitch_meas": 1.0,
+      "layer_err": 6.675627162167075e-07,
+      "land_r": 9.924999046325684,
+      "edges": 48
+    },
+    "mouth": {
+      "chamfer": 0.8,
+      "wrap_meas_deg": 179.94999999999408,
+      "wrap_full_deg": 170.7134007837793,
+      "wrap_nominal_deg": 170.0,
+      "rim_plus": 86.34999999999724,
+      "rim_minus": 93.59999999999683,
+      "true_plus": 81.7999999999975,
+      "end_plus": 86.34999999999724,
+      "cham_plus": 0.7881688735849446,
+      "true_minus": 89.04999999999708,
+      "end_minus": 93.59999999999683,
+      "cham_minus": 0.7881688735849446
+    },
+    "notch": {
+      "z_left": 42.20001220703125,
+      "z_right": 42.20001220703125,
+      "z_clear": 44.45001220703125,
+      "z_expected": 42.2,
+      "width": 4.0,
+      "depth": 2.5
+    },
+    "bulge": {
+      "z_lo": 3.0,
+      "z_hi": 41.45,
+      "x": 23.5,
+      "face_lo": 7.030008316040039,
+      "face_hi": 5.520705699920654,
+      "expect_lo": 7.0311884049342925,
+      "expect_hi": 5.520246961176516,
+      "amp_lo": 2.467373824235952,
+      "amp_hi": 0.032626175764047805
+    },
+    "root_void_scan": {
+      "stations": 61,
+      "off_circle": 0,
+      "inside": 0,
+      "open_span": 61,
+      "tested": 0
+    },
+    "moment_arm": 31.75,
+    "back_clear": 22.225,
+    "gap_eff": 14.225,
+    "projection": 45.347537994384766,
+    "print_overhang_mm2": 1.1666307166676688,
+    "print_overhang_at_x": 16.9,
+    "drop_in": {
+      "min_clearance": 0.40000000000000036,
+      "at_y": 31.75,
+      "r_root": 13.5
+    },
+    "bending": {
+      "sf": 41.36325808714438,
+      "y": 27.1,
+      "sigma": 1.208802263464345,
+      "section_h": 4.531403064727783,
+      "area": 113.28507661819458,
+      "S": 85.5567238959348,
+      "load_lbf": 5.0,
+      "sf_required": 8.0
+    },
+    "expect": {
+      "w_plate": 76.2,
+      "h_plate": 44.45,
+      "h_cap": 50.8,
+      "z_rest": -0.0,
+      "y_axis": 31.75,
+      "z_axis": 9.925,
+      "r_trough": 9.925,
+      "t_wall": 3.0,
+      "z_env_bot": -3.6999999999999993
+    }
+  },
+  "saddle_h+2": {
+    "params": {
+      "D_BAR": 19.05,
+      "H_DROP": 4.0,
+      "W_PLATE": 76.2,
+      "H_PLATE": 44.45,
+      "T_PLATE": 5.5,
+      "T_WALL": 3.0,
+      "CLEAR": 0.4,
+      "GAP": 1.0,
+      "W_SADDLE": 25.0,
+      "WRAP_DEG": 170.0
+    },
+    "counts": {
+      "verts": 13346,
+      "edges": 40032,
+      "faces": 26688,
+      "tris": 26688
+    },
+    "mesh": {
+      "non_manifold_edges": 0,
+      "boundary_edges": 0,
+      "loose_verts": 0,
+      "loose_edges": 0,
+      "shells": 1,
+      "min_edge_len": 0.005048723891377449,
+      "degenerate_faces": 0,
+      "euler": 2,
+      "topo_non_manifold_edges": 0,
+      "topo_boundary_edges": 0,
+      "topo_shells": 1,
+      "folded_faces": 104,
+      "folded_in_collar": 16
+    },
+    "purge": {
+      "triangles": 26692,
+      "components": 3,
+      "dropped_components": 2,
+      "dropped_faces": 4,
+      "volume": 32846.706163067196,
+      "volume_dropped": 0.0,
+      "triangles_kept": 26688,
+      "euler": 2,
+      "non_manifold": 0
+    },
+    "tape": {
+      "width": 76.19999694824219,
+      "height": 44.45000076293945,
+      "z_min": 0.0,
+      "max_abs_y": 0.0,
+      "faces": 101,
+      "area_mm2": 3351.1064974069595,
+      "area_in2": 5.194225459431706
+    },
+    "bbox": {
+      "x": [
+        -38.099998474121094,
+        38.099998474121094
+      ],
+      "y": [
+        0.0,
+        45.347537994384766
+      ],
+      "z": [
+        -7.699999809265137,
+        44.45000076293945
+      ]
+    },
+    "plate_height": 44.45000076293945,
+    "trough": {
+      "z_rest_measured": -4.0,
+      "z_rest_expected": -4.0,
+      "fit_y": 31.750001074077677,
+      "fit_z": 5.924797718702808,
+      "fit_r": 9.925249897302809,
+      "y_axis_expected": 31.75,
+      "z_axis_expected": 5.925000000000001,
+      "r_expected": 9.925,
+      "samples": 79
+    },
+    "wall": {
+      "min_mm": 3.499997655080756,
+      "at_phi_deg": 69.3978803309291,
+      "required": 3.0,
+      "samples": 362,
+      "swept_deg": 184.06340078377846,
+      "min_land": 3.6999973930825223,
+      "land_phi": 52.50446692792664,
+      "min_groove": 3.499997655080756,
+      "groove_phi": 69.3978803309291,
+      "groove_x": 0.5000000000000042,
+      "groove_samples": 181
+    },
+    "fillet": {
+      "upper": {
+        "r_built": 13.5,
+        "r_requested": 13.5,
+        "fit_r": 13.499101072475785,
+        "fit_c_err": 0.006841342844516838,
+        "c_y": 20.263354274892038,
+        "c_z": 22.630317058425867,
+        "corner_y": 6.739455737554365,
+        "r_min": 13.488641446295155,
+        "r_max": 13.500001412850764,
+        "rays": 61,
+        "theta": 103.23930861078543,
+        "t1": [
+          6.802874018312094,
+          21.59810038435905
+        ],
+        "t2": [
+          18.18543428258291,
+          9.291192330560024
+        ],
+        "cap": 18.661767763557297
+      },
+      "lower": {
+        "r_built": 5.0,
+        "r_requested": 5.0,
+        "fit_r": 5.001372644612361,
+        "fit_c_err": 0.002510897606868729,
+        "c_y": 2.86578078988861,
+        "c_z": -5.0,
+        "corner_y": 5.602698373193698,
+        "r_min": 4.9983289787338805,
+        "r_max": 5.000000715255686,
+        "rays": 61,
+        "theta": 131.6335393386024,
+        "t1": [
+          2.86578078988861,
+          0.0
+        ],
+        "t2": [
+          6.602827383189089,
+          -1.6781808057178547
+        ],
+        "cap": 5.21397931032653
+      }
+    },
+    "ribs": {
+      "planned": 24,
+      "pitch": 1.0,
+      "width": 0.4,
+      "depth": 0.2,
+      "layer": 0.2,
+      "x_limit": 12.5,
+      "found": 24,
+      "depth_meas": 0.19999980926513672,
+      "width_meas": 0.3999998668829614,
+      "pitch_meas": 1.0,
+      "layer_err": 6.675627162167075e-07,
+      "land_r": 9.925,
+      "edges": 48
+    },
+    "mouth": {
+      "chamfer": 0.8,
+      "wrap_meas_deg": 194.29999999999325,
+      "wrap_full_deg": 185.06340078377846,
+      "wrap_nominal_deg": 170.0,
+      "rim_plus": 88.29999999999713,
+      "rim_minus": 105.99999999999612,
+      "true_plus": 83.74999999999739,
+      "end_plus": 87.74999999999716,
+      "cham_plus": 0.7881688735849446,
+      "true_minus": 101.44999999999638,
+      "end_minus": 105.44999999999615,
+      "cham_minus": 0.7881688735849446
+    },
+    "notch": {
+      "z_left": 42.20001220703125,
+      "z_right": 42.20001220703125,
+      "z_clear": 44.45001220703125,
+      "z_expected": 42.2,
+      "width": 4.0,
+      "depth": 2.5
+    },
+    "bulge": {
+      "z_lo": 3.0,
+      "z_hi": 41.45,
+      "x": 23.5,
+      "face_lo": 7.030008316040039,
+      "face_hi": 5.520705699920654,
+      "expect_lo": 7.0311884049342925,
+      "expect_hi": 5.520246961176516,
+      "amp_lo": 2.467373824235952,
+      "amp_hi": 0.032626175764047805
+    },
+    "root_void_scan": {
+      "stations": 61,
+      "off_circle": 0,
+      "inside": 0,
+      "open_span": 61,
+      "tested": 0
+    },
+    "moment_arm": 31.75,
+    "back_clear": 22.225,
+    "gap_eff": 14.225,
+    "projection": 45.347537994384766,
+    "print_overhang_mm2": 4.917977969201104,
+    "print_overhang_at_x": 17.1,
+    "drop_in": {
+      "min_clearance": 0.40000000000000036,
+      "at_y": 31.75,
+      "r_root": 13.5
+    },
+    "bending": {
+      "sf": 33.04392527615191,
+      "y": 26.51875,
+      "sigma": 1.513137424871416,
+      "section_h": 4.295833110809326,
+      "area": 107.39582777023315,
+      "S": 76.89242548302389,
+      "load_lbf": 5.0,
+      "sf_required": 8.0
+    },
+    "expect": {
+      "w_plate": 76.2,
+      "h_plate": 44.45,
+      "h_cap": 50.8,
+      "z_rest": -4.0,
+      "y_axis": 31.75,
+      "z_axis": 5.925000000000001,
+      "r_trough": 9.925,
+      "t_wall": 3.0,
+      "z_env_bot": -7.699999999999999
+    }
+  },
+  "_exports": {
+    "saddle_h-2": {
+      "path": "/Users/chrismandich/emdash/worktrees/3d-blender-projects/emdash/setup-mcp-dkmao/projects/shade-bar-mount/saddle_h-2.stl",
+      "dims": [
+        48.15,
+        45.348,
+        76.2
+      ],
+      "tris": 26206,
+      "verts": 13105
+    },
+    "saddle_h0": {
+      "path": "/Users/chrismandich/emdash/worktrees/3d-blender-projects/emdash/setup-mcp-dkmao/projects/shade-bar-mount/saddle_h0.stl",
+      "dims": [
+        50.15,
+        45.348,
+        76.2
+      ],
+      "tris": 26688,
+      "verts": 13346
+    },
+    "saddle_h+2": {
+      "path": "/Users/chrismandich/emdash/worktrees/3d-blender-projects/emdash/setup-mcp-dkmao/projects/shade-bar-mount/saddle_h+2.stl",
+      "dims": [
+        52.15,
+        45.348,
+        76.2
+      ],
+      "tris": 26688,
+      "verts": 13346
+    }
+  },
+  "_refused": [],
+  "_stl": {
+    "saddle_h-2": {
+      "path": "/Users/chrismandich/emdash/worktrees/3d-blender-projects/emdash/setup-mcp-dkmao/projects/shade-bar-mount/saddle_h-2.stl",
+      "tris": 26206,
+      "verts": 13105,
+      "verts_exact": 13105,
+      "vertex_digest": "7137211611a62466e3951ed2b3015a01",
+      "unique_verts": 13105,
+      "weld": 0.0001,
+      "edges": 39309,
+      "degenerate": 0,
+      "open_edges": 0,
+      "over_edges": 0,
+      "euler": 2,
+      "winding_flips": 0,
+      "bodies": [
+        {
+          "tris": 26206,
+          "volume": 33126.01188758191
+        }
+      ],
+      "solids": 1,
+      "volume": 33126.01188758191,
+      "null_volume": 0,
+      "faults": []
+    },
+    "saddle_h0": {
+      "path": "/Users/chrismandich/emdash/worktrees/3d-blender-projects/emdash/setup-mcp-dkmao/projects/shade-bar-mount/saddle_h0.stl",
+      "tris": 26688,
+      "verts": 13346,
+      "verts_exact": 13346,
+      "vertex_digest": "d62fe6e866afbe4bb83f5d354e2bc0e6",
+      "unique_verts": 13346,
+      "weld": 0.0001,
+      "edges": 40032,
+      "degenerate": 0,
+      "open_edges": 0,
+      "over_edges": 0,
+      "euler": 2,
+      "winding_flips": 0,
+      "bodies": [
+        {
+          "tris": 26688,
+          "volume": 32953.0288810296
+        }
+      ],
+      "solids": 1,
+      "volume": 32953.0288810296,
+      "null_volume": 0,
+      "faults": []
+    },
+    "saddle_h+2": {
+      "path": "/Users/chrismandich/emdash/worktrees/3d-blender-projects/emdash/setup-mcp-dkmao/projects/shade-bar-mount/saddle_h+2.stl",
+      "tris": 26688,
+      "verts": 13346,
+      "verts_exact": 13346,
+      "vertex_digest": "9190e23d5ebc63af6279137c7d913062",
+      "unique_verts": 13346,
+      "weld": 0.0001,
+      "edges": 40032,
+      "degenerate": 0,
+      "open_edges": 0,
+      "over_edges": 0,
+      "euler": 2,
+      "winding_flips": 0,
+      "bodies": [
+        {
+          "tris": 26688,
+          "volume": 32846.705663076486
+        }
+      ],
+      "solids": 1,
+      "volume": 32846.705663076486,
+      "null_volume": 0,
+      "faults": []
+    }
+  }
+}
