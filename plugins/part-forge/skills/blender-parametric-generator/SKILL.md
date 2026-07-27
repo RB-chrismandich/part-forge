@@ -105,11 +105,19 @@ The load-bearing ones:
 - **Convex erosion is a 45-degree flare.** Eroding a convex profile by `d` per unit of travel
   produces exactly a 45-degree taper — which is also the overhang the printer can manage
   unsupported, so the two constraints can be satisfied by one operation.
-- **Booleans need a retry and a no-op check.** Run the fast solver, fall back to the exact
-  one, and raise if the result is unchanged. A boolean that silently does nothing produces a
-  part that looks plausible and is wrong.
-- **Weld between boolean stages.** Coincident-but-distinct vertices accumulate across
-  operations and the next boolean chokes on them.
+- **Booleans need a retry and a *signed* volume check.** Run the fast solver, fall back to
+  the exact one, and accept only when the volume moved the way the operation requires —
+  removing material cannot grow a solid. A boolean that silently does nothing produces a part
+  that looks plausible and is wrong; a declined solver bakes the cutter in as a second shell,
+  which grows the volume and satisfies any guard that only asks whether something changed.
+- **Weld between boolean stages, but do not recalculate normals.** Coincident-but-distinct
+  vertices accumulate across operations and the next boolean chokes on them, so use
+  `weld_verts`. `recalc_face_normals` travels with the weld out of habit and turns any sealed
+  cavity inside out, silently making a hollow part solid — `clean_mesh` now defaults
+  `recalc_normals=False` for that reason.
+- **Shell a loft perpendicular to the surface.** An in-plane inset leaves `d * cos(alpha)` of
+  wall wherever the surface slopes, and on a 45-degree cone leaves exactly zero. Use
+  `offset_rings`, and give the floor its own thickness.
 - **Name filter rules, never number them.** A header reading "four rules" sat above a filter
   that tested six. Numbering a list in prose creates a claim that rots.
 - **Purge debris, and assert the volume did not move.** Drop connected components below a

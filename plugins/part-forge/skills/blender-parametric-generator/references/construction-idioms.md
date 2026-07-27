@@ -111,22 +111,48 @@ same arithmetic that produced it.
 for that rather than lofting an empty ring -- an empty ring is a `bmesh` error several frames
 from its cause.
 
-## Booleans: overlap, retry, and verify the volume moved
+## Booleans: overlap, retry, and verify the volume moved the RIGHT WAY
 
-**Failure prevented:** a boolean that silently does nothing.
+**Failure prevented:** a boolean that silently does nothing, and the worse one that silently
+does the opposite.
 
 The worst boolean outcome is not a crash. It is a modifier that reports success, changes
 nothing, and leaves a part that looks plausible and is wrong. The modifier will not tell you;
 the volume will.
 
+But the volume only tells you if you ask it the right question. This guard is not enough:
+
 ```
 before = volume(target)
 apply(solver)
-if abs(volume(target) - before) <= NULL_VOLUME:  retry with EXACT, then raise
+if abs(volume(target) - before) > NULL_VOLUME:  accept        # WRONG
 ```
 
-`part_kit.boolean` does this and raises with both volumes in the message, because the usual
-cause is a cutter that does not actually reach the target.
+When a solver declines -- and MANIFOLD declines intermittently, on input that every other
+tool calls perfect -- the failed modifier still bakes, and it contributes the cutter's
+geometry as a second closed shell. So a DIFFERENCE comes back having **grown** by exactly the
+cutter's volume. `abs()` is satisfied, the first attempt is accepted, and the EXACT retry
+that would have worked is never reached. The broken solver is preferred *because* it moved
+the number.
+
+Removing material cannot grow a solid. The sign is a property of the operation:
+
+```
+EXPECTED = {"DIFFERENCE": -1, "UNION": +1, "INTERSECT": -1}
+delta = after - before
+if abs(delta) > NULL_VOLUME and delta * EXPECTED[operation] > 0:  accept
+```
+
+Keep both halves. Magnitude alone accepts the merge; sign alone re-admits sub-tolerance noise
+pointing the right way.
+
+`part_kit.boolean` does this, and its failure message distinguishes the two causes because
+their fixes are opposite: "nothing moved on either solver" means the cutter missed, while a
+result equal to `target + cutter` is the merge signature and means the solver declined. It
+also captures Blender's stderr around the modifier bake and attaches it. Blender reports
+`Cannot execute ... have non-manifold geometry` on file descriptor 2 and exposes it through
+no Python API at all; six such warnings were emitted during the build that produced this
+section and not one reached the exception.
 
 Prefer an **overlap** to a coplanar butt joint. Two solids meeting exactly face-to-face give
 the solver a degenerate case it may resolve into coincident-but-distinct vertices -- which is
@@ -139,9 +165,10 @@ Apply the modifier through the depsgraph rather than an operator. Operator calls
 context that does not exist in `--background`, and the depsgraph path works identically in
 both invocation modes.
 
-## Weld between boolean stages
+## Weld between boolean stages -- but never recalculate normals on a vessel
 
-**Failure prevented:** the third boolean failing because of debris from the first.
+**Failure prevented:** the third boolean failing because of debris from the first, and the
+much worse one where the cleanup step silently fills the part in.
 
 Each boolean leaves coincident-but-distinct vertices along its seams. They accumulate, and a
 later operation chokes on geometry that looks clean in the viewport. A `remove_doubles` at a
@@ -151,6 +178,106 @@ Pick the weld distance well below the smallest real feature and well above float
 the reference and the template use 5e-3 mm. Record the range swept -- the reference tried
 0.005 through 0.08 mm and found the outcome flat across all of it, which is worth writing
 down so nobody repeats the experiment.
+
+**The trap is what usually travels with the weld.** `bmesh.ops.recalc_face_normals` orients
+every face outward from its own connected component. On a solid that is a repair. On a
+vessel it is destruction: a sealed cavity is a separate component whose faces must point
+*into* the surrounding material, and recalc turns them out.
+
+Measured on a 20 mm cube with a concentric 14 mm cavity:
+
+| stage | signed volume | what it means |
+|---|---|---|
+| after the cavity is cut | 5256 mm3 | 8000 - 2744, correct |
+| after recalc | 10744 mm3 | 8000 + 2744, solid |
+
+Nothing downstream sees it. `open_edges`, `over_edges`, `bodies` and `genus` are all
+unchanged, and `winding_flips` reads **0 on both sides** -- a uniformly flipped component
+contains no disagreeing adjacent pair, so the check that sounds like it covers orientation
+does not cover this. The only number that moves is `inverted_bodies`, from 1 to 0, which is
+to say the corruption's sole witness is the count it erases.
+
+So `part_kit.clean_mesh` takes `recalc_normals` and it defaults to **False**, and
+`part_kit.weld_verts` is the weld with no orientation pass at all. Reach for `weld_verts`
+between stages. Pass `recalc_normals=True` only for a solid whose winding you actively
+doubt, and read the volumes `clean_mesh` returns rather than assuming a repair was free.
+
+The same call sat at the end of `triangulate_and_purge`, one stage later and directly on the
+export path, and is now under the same flag with the same default.
+
+## Shell a loft by offsetting PERPENDICULAR to the surface, never in-plane
+
+**Failure prevented:** a 2.64 mm wall that measures 1.60 mm, and is exact in the plane you
+checked it in.
+
+Hollowing a loft is the commonest thing a container part needs -- a bank, a vase, a housing,
+an enclosure -- and the obvious construction is wrong everywhere the surface is not vertical.
+
+Inset each ring by `d` within its own plane, clamp the z range by the same `d`, and the
+in-plane distance between outer and inner ring is exactly `d` at every height. Verified
+numerically on the part that produced this section: 2.640 mm at every height, to three
+decimals. The **perpendicular** wall, which is the one that gets printed, is `d * cos(alpha)`
+where `alpha` is the surface's tilt off vertical. On the upper dome that was 1.60 mm.
+
+**The limit case is the one to remember, because nobody derives it.** On a 45 degree cone,
+insetting `d` horizontally *and* `d` vertically reproduces the original surface exactly and
+leaves a wall of zero:
+
+```
+outer:  r = R - z
+inner:  r = (R - d) - (z - d) = R - z          identical, wall = 0
+```
+
+The construction that feels obviously conservative is degenerate. Nothing about it looks
+wrong, and every in-plane measurement of it agrees that the wall is there.
+
+The correction is a horizontal inset of `d * sqrt(1 + m^2)` per ring vertex, where `m` is the
+surface's outward run per unit rise at that vertex. Per **vertex**, not per ring: on a
+non-circular section the slope varies with direction around the ring, so a single scalar per
+height is already the wrong shape. `part_kit.offset_rings` takes it by finite difference
+along each vertex's own inward normal, which needs no assumption about where the section is
+centred.
+
+**A container's floor is not its wall.** The part this came from carries bayonet ledges in a
+6.0 mm floor under a 2.64 mm wall, and letting the floor default to the wall inset was a
+second, independent defect in the same function. So `offset_rings` takes `floor` and
+`ceiling` as keyword-only arguments with **no defaults**: omitting one is a TypeError at the
+call site, which is the only failure mode in this area that cannot reach a printer.
+
+It also refuses a wall that inverts the section, and refuses one whose inset vertices land
+outside the outer ring -- the concave case, where a uniform offset self-intersects.
+
+## Measure an opening with a raster, not with the mesh beside it
+
+**Failure prevented:** a check that reports the ray origin's own offset back as a
+measurement.
+
+To ask whether a coin fits a slot, cast a grid of parallel rays through the slot and measure
+the band that gets through. Do not measure the material near it.
+
+The tempting alternative is a single ray and a single number, and it fails in a way that
+reads exactly like a real defect. `thickness_at` called from a point that was not on the
+surface returned 1.60 mm for a 2.64 mm wall -- the first hit was a slot wall at
+`x = SLOT_W/2 = 1.6`, a thoroughly plausible thickness. Called from 1 mm below the part it
+returned exactly 1.0000 for a 6.0 mm floor: the origin's own offset, which it would have
+returned for any geometry whatsoever, including none.
+
+A check that returns a constant regardless of the model is not a weak check. It is a
+fabricated one, and it presented as a legitimate failure twice.
+
+`part_kit.Probe.raster` returns counts beside the spans, and the counts are the honest part:
+
+- `span_u is None` means **no ray got through** -- the feature was never cut. That fails a
+  gate, where a scalar would have quietly returned something.
+- `all_clear` means every ray passed, which nearly always means the raster was aimed past
+  the part rather than through it. Aim it so a ray that misses the opening lands on solid
+  material; otherwise "nothing blocked it" and "it went through the slot" are the same
+  reading, which is the original bug wearing a different hat.
+- The spans run between outermost passing ray **centres**, so they understate the true
+  aperture by up to one pitch per side. Biased toward failing a marginal part, which is the
+  right direction, but not a number to quote as the dimension.
+
+The station matters more than the resolution. Pick where to aim before picking how many rays.
 
 ## Selective bevel: name the rules, and know what clamping costs
 
@@ -181,9 +308,21 @@ floor is right; doing it without checking is not, because the same code that rem
 
 Compute the total before, drop, compute after, and require that the difference equals the
 volume of what was intentionally dropped. Report the dropped count and volume separately so
-"removed three specks" and "removed a boss" are distinguishable in the log. `part_kit.
-triangulate_and_purge` raises when more than one substantial component survives, since that
-means the part is not one solid.
+"removed three specks" and "removed a boss" are distinguishable in the log.
+
+`part_kit.triangulate_and_purge` takes `expect_components`, and **declaring the number is
+worth more than permitting any number.** It used to hard-code 1, which refused a plate of ten
+test coupons -- the most ordinary thing this repository builds, since printing the question
+is how any clearance gets answered -- and refused a vessel, whose sealed cavity is a
+component in its own right with negative volume.
+
+Pass 1 for a solid, N for a plate of N coupons, and 1 + K for a vessel with K cavities. An
+exact count is strictly stronger than a permissive flag in both directions: it catches stray
+debris, which raises the number, *and* a plug fused to its socket, which lowers it. A boolean
+`allow_multi_body` can only ever express one of those.
+
+`volume` in the returned stats sums over surviving components, so for a vessel it is the
+material volume and is the number a mass estimate should use.
 
 ## Tessellation counts are empirical constants, and some are landmines
 

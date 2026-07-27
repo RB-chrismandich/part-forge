@@ -41,6 +41,8 @@ from __future__ import annotations
 
 import math
 import os
+import sys
+import tempfile
 
 try:
     import bpy
@@ -250,6 +252,156 @@ def polygon_area(poly):
                      for i in range(n))
 
 
+def inward_normals(poly):
+    """Unit inward normal per vertex of a closed simple polygon, either winding.
+
+    Winding is read from the signed area rather than assumed. A ring arriving from
+    a profile generator carries whatever winding that generator used, and an offset
+    applied the wrong way grows the part instead of hollowing it -- silently, since
+    the result is still a valid closed ring.
+    """
+    n = len(poly)
+    if n < 3:
+        raise ValueError(f"inward_normals needs 3 or more points, got {n}")
+    ccw = polygon_area(poly) > 0.0
+    edge = []
+    for i in range(n):
+        au, av = poly[i]
+        bu, bv = poly[(i + 1) % n]
+        eu, ev = bu - au, bv - av
+        ln = math.hypot(eu, ev)
+        if ln < 1e-12:
+            edge.append((0.0, 0.0))
+            continue
+        eu, ev = eu / ln, ev / ln
+        edge.append((-ev, eu) if ccw else (ev, -eu))
+    out = []
+    for i in range(n):
+        pu, pv = edge[(i - 1) % n]
+        qu, qv = edge[i]
+        su, sv = pu + qu, pv + qv
+        ln = math.hypot(su, sv)
+        out.append((qu, qv) if ln < 1e-12 else (su / ln, sv / ln))
+    return out
+
+
+def _ring_lerp(a, b, t):
+    return [(au + (bu - au) * t, av + (bv - av) * t)
+            for (au, av), (bu, bv) in zip(a, b)]
+
+
+def _ring_at_z(rings, zs, z):
+    """Linear interpolation of the ring stack at an arbitrary height."""
+    if z <= zs[0]:
+        return list(rings[0])
+    if z >= zs[-1]:
+        return list(rings[-1])
+    for i in range(len(zs) - 1):
+        if zs[i] <= z <= zs[i + 1]:
+            span = zs[i + 1] - zs[i]
+            return _ring_lerp(rings[i], rings[i + 1],
+                              0.0 if span < 1e-12 else (z - zs[i]) / span)
+    return list(rings[-1])
+
+
+def offset_rings(rings, zs, wall, *, floor, ceiling):
+    """Inset a ring stack `wall` PERPENDICULAR to the lofted surface, not in-plane.
+
+    Hollowing a loft is the commonest operation any container part needs -- a bank,
+    a vase, a housing, an enclosure -- and the obvious construction is wrong.
+
+    Insetting each ring by `d` within its own plane leaves `d` of wall only where
+    the surface is vertical. Where the surface slopes `alpha` off vertical the
+    perpendicular wall is `d * cos(alpha)`. It is wrong *quietly*, because in-plane
+    it is exact: on the part that produced this function the minimum in-plane
+    distance between outer and inset ring measured 2.640 mm at every height, to
+    three decimals, while the real wall on the upper dome was 1.60 mm.
+
+    **The limit case is the one to remember, because nobody derives it.** On a 45
+    degree cone, insetting `d` horizontally *and* `d` vertically reproduces the
+    original surface exactly and leaves a wall of zero: with `r = R - z`, the inset
+    gives `r = (R - d) - (z - d) = R - z`. The construction that feels obviously
+    conservative is degenerate.
+
+    The correction is a horizontal inset of `wall * sqrt(1 + m**2)` per ring vertex,
+    where `m` is the surface's outward run per unit rise at that vertex, taken by
+    finite difference along the vertex's own inward normal. Per vertex and not per
+    ring, because on a non-circular section the slope varies with direction.
+
+    `floor` and `ceiling` are keyword-only and have **no defaults**. A container's
+    floor is usually not its wall thickness -- the part this came from carries
+    bayonet ledges in a 6.0 mm floor under a 2.64 mm wall -- and letting the floor
+    default to the wall inset was a second, independent defect in the same function.
+    Omitting them is a TypeError at the call site, which is the only failure mode
+    here that cannot reach a printer.
+
+    Returns `(inset_rings, inset_zs)`, ready to hand to `loft_solid` as a cavity.
+    """
+    n = len(rings)
+    if n != len(zs):
+        raise ValueError(f"offset_rings: {n} rings but {len(zs)} heights")
+    if n < 2:
+        raise ValueError(f"offset_rings needs 2 or more rings, got {n}")
+    width = len(rings[0])
+    for i, r in enumerate(rings):
+        if len(r) != width:
+            raise ValueError(
+                f"offset_rings: ring {i} has {len(r)} points, ring 0 has {width}; "
+                f"every ring must carry the same vertex count so the loft closes"
+            )
+    for i in range(n - 1):
+        if zs[i + 1] <= zs[i]:
+            raise ValueError(
+                f"offset_rings: heights must strictly increase, but z[{i}]={zs[i]} "
+                f"and z[{i + 1}]={zs[i + 1]}"
+            )
+    if wall <= 0.0:
+        raise ValueError(f"offset_rings: wall must be positive, got {wall}")
+    if not zs[0] <= floor < ceiling <= zs[-1]:
+        raise ValueError(
+            f"offset_rings: need {zs[0]} <= floor < ceiling <= {zs[-1]}, got "
+            f"floor={floor}, ceiling={ceiling}"
+        )
+
+    out_zs = sorted({float(floor), float(ceiling)}
+                    | {float(z) for z in zs if floor < z < ceiling})
+    step = max(1e-4, (zs[-1] - zs[0]) * 1e-3)
+    out_rings = []
+    for z in out_zs:
+        outer = _ring_at_z(rings, zs, z)
+        norms = inward_normals(outer)
+        z_lo, z_hi = max(zs[0], z - step), min(zs[-1], z + step)
+        lo, hi = _ring_at_z(rings, zs, z_lo), _ring_at_z(rings, zs, z_hi)
+        dz = z_hi - z_lo
+        ring = []
+        for j in range(width):
+            nu, nv = norms[j]
+            # Outward run per unit rise, projected on this vertex's own normal.
+            # Coordinate-free: no assumption that the section is centred anywhere.
+            m = 0.0 if dz < 1e-12 else -(
+                (hi[j][0] - lo[j][0]) * nu + (hi[j][1] - lo[j][1]) * nv) / dz
+            d = wall * math.sqrt(1.0 + m * m)
+            ring.append((outer[j][0] + d * nu, outer[j][1] + d * nv))
+
+        a_out, a_in = polygon_area(outer), polygon_area(ring)
+        if a_out == 0.0 or a_in * a_out <= 0.0 or abs(a_in) >= abs(a_out):
+            raise ValueError(
+                f"offset_rings: a {wall} mm perpendicular wall collapses the section "
+                f"at z={z:.3f} (area {abs(a_out):.3f} -> {abs(a_in):.3f} mm^2). The "
+                f"surface slopes too fast to hold this wall; thin the wall, or stop "
+                f"the cavity below this height with `ceiling`."
+            )
+        for j in range(width):
+            if not point_in_poly(ring[j], outer):
+                raise ValueError(
+                    f"offset_rings: inset vertex {j} at z={z:.3f} landed outside the "
+                    f"outer ring; the section is too concave for a {wall} mm wall "
+                    f"there. Reduce the wall or resample the profile."
+                )
+        out_rings.append(ring)
+    return out_rings, out_zs
+
+
 def tangent_fillet(p, u1, u2, r, seg=16):
     """Arc of radius r tangent to both rays leaving p along unit directions u1, u2.
 
@@ -423,17 +575,95 @@ class Probe:
                 out.append((a, radius - hit[3]))
         return out
 
-    def thickness_at(self, point, direction, max_dist=1.0e4, eps=1.0e-4):
-        """Material thickness from a surface point along `direction`.
+    def thickness_at(self, point, direction, max_dist=1.0e4, eps=1.0e-4,
+                     on_surface_tol=1.0e-3):
+        """Material thickness from a point **on the surface**, along `direction`.
 
         Starts just inside the surface so the first hit is the opposing wall.
         Reads a chord rather than a throat inside a fillet, so it is a screen for
         gross thin walls and not a certificate. Callipers on the printed part
         remain the authority.
+
+        The precondition is now enforced, and returns `None` when it fails, because
+        the unenforced version did not fail — it returned confident wrong numbers
+        that read as real defects:
+
+        - From the part's axis casting outward it returned 1.60 mm for a 2.64 mm
+          wall. The first hit was a coin-slot wall at `x = SLOT_W/2 = 1.6`, and
+          1.6 mm is a thoroughly plausible wall. It was investigated as a thin wall.
+        - From 1 mm below the part casting up it returned exactly 1.0000 for a 6.0 mm
+          floor: the distance from the origin to the first surface, which is the
+          origin's own offset handed back. It would have returned 1.0000 for any
+          geometry at all, including none.
+
+        The second is the worse failure. A check that returns a constant regardless
+        of the model is not weak, it is fabricated, and it presented as a legitimate
+        failure twice.
+
+        Both questions were really *"how wide is this void"*, asked with the
+        measure-material tool. Use `raster` for a void; it cannot answer with a
+        number it invented.
         """
+        p = Vector(point)
+        near = self.tree.find_nearest(p)
+        if near is None or near[3] > on_surface_tol:
+            return None
         d = Vector(direction).normalized()
-        hit = self.cast(Vector(point) + d * eps, d, max_dist)
+        hit = self.cast(p + d * eps, d, max_dist)
         return None if hit is None else hit[3] + eps
+
+    def raster(self, centre, direction, axis_u, axis_v, half_u, half_v,
+               n_u=41, n_v=41, max_dist=1.0e4):
+        """Cast a grid of parallel rays through a region; report what got through.
+
+        This is how to measure an *opening* — a coin slot, a bore, a drain — rather
+        than measuring the mesh beside it. It answers the physical question the part
+        has to satisfy, "can the coin fit", and it answers `span_u is None` when the
+        feature was never cut, which fails a gate instead of quietly passing one.
+
+        Returns counts alongside the spans, deliberately. The spans are measured
+        between the outermost *ray centres* that passed, so they understate the true
+        aperture by up to one pitch — a bias toward failing a marginal part, which is
+        the right direction, but not a number to quote as the dimension.
+
+        **The station matters more than the resolution.** Aim the raster so that a
+        ray missing the opening lands on solid material. If it can miss the part
+        entirely, "nothing blocked it" and "it passed through the slot" become the
+        same reading, which is `thickness_at`'s bug wearing a different hat.
+        `all_clear` is set when every single ray passed, which nearly always means
+        the raster was aimed past the part rather than through it.
+        """
+        cu, cv = Vector(axis_u).normalized(), Vector(axis_v).normalized()
+        d = Vector(direction).normalized()
+        c = Vector(centre)
+        clear, tested = [], 0
+        for i in range(n_u):
+            su = -half_u + (2.0 * half_u * i / (n_u - 1)) if n_u > 1 else 0.0
+            for j in range(n_v):
+                sv = -half_v + (2.0 * half_v * j / (n_v - 1)) if n_v > 1 else 0.0
+                tested += 1
+                if self.cast(c + cu * su + cv * sv, d, max_dist) is None:
+                    clear.append((su, sv))
+
+        out = {
+            "tested": tested,
+            "clear": len(clear),
+            "all_clear": bool(tested) and len(clear) == tested,
+            "pitch_u": (2.0 * half_u / (n_u - 1)) if n_u > 1 else 0.0,
+            "pitch_v": (2.0 * half_v / (n_v - 1)) if n_v > 1 else 0.0,
+            "span_u": None, "span_v": None, "centre_u": None, "centre_v": None,
+        }
+        if not clear:
+            return out
+        us = [u for u, _ in clear]
+        vs = [v for _, v in clear]
+        out.update({
+            "span_u": max(us) - min(us),
+            "span_v": max(vs) - min(vs),
+            "centre_u": (max(us) + min(us)) / 2.0,
+            "centre_v": (max(vs) + min(vs)) / 2.0,
+        })
+        return out
 
     def min_wall(self, stations, axis_u, axis_v, r_inner, angles_deg,
                  max_wall=1.0e3, eps=1.0e-4):
@@ -675,8 +905,31 @@ def prism(name, pts2d, to3d, extrude):
     ret = bmesh.ops.extrude_face_region(bm, geom=[face])
     moved = [e for e in ret["geom"] if isinstance(e, bmesh.types.BMVert)]
     bmesh.ops.translate(bm, verts=moved, vec=Vector(extrude))
+    _triangulate_ngons(bm)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return _object_from_bmesh(name, bm)
+
+
+def _triangulate_ngons(bm):
+    """Fan-triangulate faces with more than four vertices, in place.
+
+    A cap spanning a 96-point ring is a 96-gon. Blender's own bmesh calls the result
+    impeccable — zero non-manifold edges, zero wire edges, zero duplicate positions —
+    and `positional_topology` agrees at genus 0. The MANIFOLD boolean solver declines
+    it anyway, in the full build sequence though not in isolation, which makes the
+    trigger state-dependent and not purely the cap.
+
+    That intermittency is the argument for doing this unconditionally rather than
+    reacting to a failure: a declined solver and a working one are distinguishable
+    only by `boolean`'s sign guard, and a class of input that provokes one sometimes
+    is cheaper to remove than to detect. Quad side walls are left alone; adding
+    triangles no solver objected to only costs file size.
+
+    Adds no vertices, so any pinned vertex digest is unaffected by construction.
+    """
+    ngons = [f for f in bm.faces if len(f.verts) > 4]
+    if ngons:
+        bmesh.ops.triangulate(bm, faces=ngons)
 
 
 def loft_solid(name, rings, to3d, cap=True):
@@ -703,18 +956,30 @@ def loft_solid(name, rings, to3d, cap=True):
     if cap:
         bm.faces.new(list(reversed(grid[0])))
         bm.faces.new(grid[-1])
+    _triangulate_ngons(bm)
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return _object_from_bmesh(name, bm)
 
 
 def hull_solid(name, rings):
-    """Convex hull of a point cloud. Only valid when the result *is* convex."""
+    """Convex hull of a point cloud. Only valid when the result *is* convex.
+
+    `convex_hull` returns the points it swallowed as `geom_interior` and leaves them
+    in the bmesh. Deleting them matters: a vertex belonging to no face is invisible
+    in the viewport, survives export as a loose vertex, and shows up downstream as a
+    positional body with no volume -- which `mesh_audit` gates at `null_volume_bodies`
+    and `loose vertices`. The version this kit was distilled from removed them and
+    this one did not.
+    """
     _need_bpy("hull_solid")
     bm = bmesh.new()
     for ring in rings:
         for co in ring:
             bm.verts.new(co)
-    bmesh.ops.convex_hull(bm, input=bm.verts)
+    res = bmesh.ops.convex_hull(bm, input=bm.verts)
+    interior = [g for g in res.get("geom_interior", []) if g.is_valid]
+    if interior:
+        bmesh.ops.delete(bm, geom=interior, context="VERTS")
     bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     return _object_from_bmesh(name, bm)
 
@@ -728,30 +993,145 @@ def _object_from_bmesh(name, bm):
     return obj
 
 
+#: Which way a correct boolean moves the signed volume. Removing material cannot
+#: grow a solid and adding material cannot shrink one, so the sign is a property
+#: of the operation and not of the geometry.
+VOLUME_SIGN = {"DIFFERENCE": -1, "UNION": +1, "INTERSECT": -1}
+
+
 def boolean(target, cutter, operation, solver="MANIFOLD", keep_cutter=False):
-    """Apply a boolean, retry with the exact solver, and raise if nothing happened.
+    """Apply a boolean and raise unless the volume moved the way the operation requires.
 
     A boolean that silently does nothing is the worst outcome available: the part
-    still looks plausible and is wrong. The volume comparison is the only reliable
-    way to notice, because the modifier reports success either way.
+    still looks plausible and is wrong. A boolean that silently does the *opposite*
+    is worse, and it is the one that actually shipped. When a solver declines, the
+    failed modifier still bakes, contributing the cutter as a second closed shell —
+    so a DIFFERENCE comes back having *grown* by exactly the cutter's volume.
+
+    Any guard phrased as "did something happen" is satisfied by that merge, accepts
+    it on the first attempt, and never reaches the retry that would have worked. The
+    magnitude test is necessary and was never sufficient; the sign is what says the
+    right thing happened.
     """
     _need_bpy("boolean")
+    if operation not in VOLUME_SIGN:
+        raise ValueError(
+            f"boolean: unknown operation {operation!r}; expected one of "
+            f"{', '.join(sorted(VOLUME_SIGN))}"
+        )
+    want = VOLUME_SIGN[operation]
+
     before = mesh_volume(target)
+    v_cutter = mesh_volume(cutter)
+    trace = []
     for attempt in (solver, "EXACT"):
-        _apply_boolean(target, cutter, operation, attempt)
+        noise = _apply_boolean(target, cutter, operation, attempt)
         after = mesh_volume(target)
-        if abs(after - before) > NULL_VOLUME:
+        delta = after - before
+        trace.append((attempt, after, delta, noise))
+        if abs(delta) > NULL_VOLUME and delta * want > 0:
             if not keep_cutter:
                 purge(cutter.name)
             return target
+
     raise RuntimeError(
-        f"boolean {operation} of {cutter.name} into {target.name} changed nothing "
-        f"(volume {before:.6f} -> {after:.6f}) after both solvers; the cutter "
-        f"probably does not overlap the target"
+        _boolean_failure(target, cutter, operation, before, v_cutter, trace)
     )
 
 
+def _boolean_failure(target, cutter, operation, before, v_cutter, trace):
+    """Say which of the two failures happened, because the fixes are different.
+
+    "Changed nothing" and "changed the wrong way" have the same old message and
+    opposite causes: the first means the cutter missed, the second means a solver
+    declined and its geometry was merged in. Naming the merge signature — that the
+    result equals target plus cutter — is what turns a multi-stage volume bisect
+    into a first-read diagnosis.
+    """
+    last_delta = trace[-1][2]
+    moved = any(abs(d) > NULL_VOLUME for _, _, d, _ in trace)
+    lines = [
+        f"boolean {operation} of {cutter.name} into {target.name} failed.",
+        f"  target volume before  {before:14.6f}",
+        f"  cutter volume         {v_cutter:14.6f}",
+    ]
+    for attempt, after, delta, _ in trace:
+        lines.append(f"  after {attempt:<9s}       {after:14.6f}   (delta {delta:+.6f})")
+
+    if not moved:
+        lines.append("  Nothing moved on either solver: the cutter does not overlap "
+                     "the target.")
+    else:
+        lines.append(f"  The volume moved the wrong way for a {operation}, which is "
+                     f"never correct.")
+        if abs((before + v_cutter) - trace[-1][1]) <= max(1e-6, abs(v_cutter) * 1e-6):
+            lines.append("  The result equals target + cutter exactly. That is the merge "
+                         "signature: the")
+            lines.append("  solver declined and the failed modifier baked the cutter in "
+                         "as a second shell.")
+        elif last_delta * VOLUME_SIGN[operation] < 0:
+            lines.append("  A cutter or target wound inside out produces this too — check "
+                         "signed volumes.")
+
+    noise = "\n".join(n.strip() for _, _, _, n in trace if n and n.strip())
+    if noise:
+        lines.append("  Blender said:")
+        lines.extend(f"    {ln}" for ln in noise.splitlines() if ln.strip())
+    return "\n".join(lines)
+
+
+class _Captured:
+    """Mutable holder so a caller can read fd-2 output after the block closes."""
+
+    __slots__ = ("text",)
+
+    def __init__(self):
+        self.text = ""
+
+
+def _capture_fd2(into):
+    """Capture C-level stderr around a block. Returns a context manager.
+
+    Blender reports a declined solver as `Cannot execute ... have non-manifold
+    geometry` on the process's stderr, not through any Python API — `bpy` exposes
+    no handle on it at all. A harness that does not read file descriptor 2 is
+    discarding the only direct evidence of why a boolean failed, which is exactly
+    what happened: six such warnings were emitted and none reached the exception.
+
+    Degrades to a no-op if the descriptor cannot be duplicated, because losing the
+    diagnostic is survivable and losing stderr is not.
+    """
+    import contextlib
+
+    @contextlib.contextmanager
+    def _cm():
+        try:
+            saved = os.dup(2)
+        except (OSError, AttributeError):
+            yield
+            return
+        # Not a `with`: the handle must outlive the yield, and the finally below
+        # both restores fd 2 and closes it. SIM115 does not model that shape.
+        tmp = tempfile.TemporaryFile(mode="w+b")  # noqa: SIM115
+        try:
+            sys.stderr.flush()
+            os.dup2(tmp.fileno(), 2)
+            yield
+        finally:
+            try:
+                sys.stderr.flush()
+            finally:
+                os.dup2(saved, 2)
+                os.close(saved)
+            tmp.seek(0)
+            into.text = tmp.read().decode("utf-8", "replace")
+            tmp.close()
+
+    return _cm()
+
+
 def _apply_boolean(target, cutter, operation, solver):
+    """Add, evaluate and bake one boolean modifier. Returns Blender's stderr chatter."""
     mod = target.modifiers.new(name="_bool", type="BOOLEAN")
     mod.operation = operation
     mod.object = cutter
@@ -759,7 +1139,10 @@ def _apply_boolean(target, cutter, operation, solver):
         mod.solver = solver
     except TypeError:  # older builds lack this solver enum value
         mod.solver = "EXACT"
-    _apply_modifiers(target)
+    cap = _Captured()
+    with _capture_fd2(cap):
+        _apply_modifiers(target)
+    return cap.text
 
 
 def _apply_modifiers(obj):
@@ -774,43 +1157,113 @@ def _apply_modifiers(obj):
         bpy.data.meshes.remove(old)
 
 
-def clean_mesh(obj, merge_dist=5.0e-3):
-    """Weld coincident vertices and drop degenerate geometry.
+def weld_verts(obj, merge_dist=5.0e-3):
+    """Weld coincident vertices and dissolve degenerate edges. Never reorients.
 
     Run between boolean stages. Coincident-but-distinct vertices accumulate across
-    operations and the next boolean chokes on them.
+    operations and the next boolean chokes on them. That half of the old `clean_mesh`
+    was true and necessary; only the orientation pass welded to it was not.
+
+    Named `weld_verts` rather than `weld` on purpose: `mesh_audit.weld` is a
+    different operation on a different data structure, and `gated_export` already
+    binds `weld` as a parameter name, so a module-level `weld` would be shadowed
+    inside the one function most likely to want it.
     """
-    _need_bpy("clean_mesh")
+    _need_bpy("weld_verts")
     bm = bmesh.new()
     bm.from_mesh(obj.data)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=merge_dist)
     bmesh.ops.dissolve_degenerate(bm, dist=merge_dist, edges=bm.edges)
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(obj.data)
     bm.free()
     return obj
 
 
+def clean_mesh(obj, merge_dist=5.0e-3, recalc_normals=False):
+    """Weld, reorient only when asked, and report the volume either side.
+
+    **`recalc_normals` defaults to False, and that is a deliberate break with the
+    previous behaviour.** `bmesh.ops.recalc_face_normals` orients every face outward
+    from its own connected component. On a solid that is a repair. On a vessel it is
+    silent corruption: a sealed cavity is a separate component whose faces must point
+    *into* the surrounding material for the signed volume to come out as outer minus
+    cavity, and recalc turns them the other way.
+
+    Measured on a 20 mm cube with a concentric 14 mm cavity: 5256 mm^3 before,
+    10744 mm^3 after — which is outer *plus* cavity, 8000 + 2744. The part is now
+    solid to every consumer, and the next boolean treats the cavity as material.
+
+    Nothing downstream catches it. `winding_flips` reads 0 on both sides, because a
+    uniformly flipped component contains no disagreeing adjacent pair; `open_edges`,
+    `over_edges`, `genus` and `bodies` are all unchanged. The single signal that moves
+    is `inverted_bodies`, from 1 to 0 — so the corruption's only witness is the count
+    it destroys, and a gate demanding `inverted_bodies == 0` actively prefers the
+    corrupted mesh to the correct one.
+
+    Pass `recalc_normals=True` only for a solid whose winding you have reason to
+    doubt. Returns stats rather than the object: a repair that changes the artifact
+    and reports nothing is the same failure in a smaller frame.
+    """
+    _need_bpy("clean_mesh")
+    before = mesh_volume(obj)
+    weld_verts(obj, merge_dist)
+    if recalc_normals:
+        bm = bmesh.new()
+        bm.from_mesh(obj.data)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        bm.to_mesh(obj.data)
+        bm.free()
+    after = mesh_volume(obj)
+    return {
+        "volume_before": before,
+        "volume_after": after,
+        "volume_delta": after - before,
+        "recalc_normals": recalc_normals,
+    }
+
+
 def mesh_volume(obj):
-    """Signed volume by the divergence theorem, on triangulated geometry."""
+    """Signed volume by the divergence theorem, recentred and in float64.
+
+    Delegates to `_group_volume` rather than repeating the sum, because the naive
+    form -- mathutils vectors about the world origin -- is single precision and
+    cancels badly. This function is the instrument behind `boolean`'s sign guard,
+    which compares its output against `NULL_VOLUME` at 1e-6 mm^3; float32 epsilon on
+    a part sitting tens of millimetres from the origin is comfortably above that, so
+    the naive version put the guard's threshold below its own noise floor. A boolean
+    that legitimately changed nothing could then produce a delta of arbitrary sign
+    that cleared both tests, which is the exact failure the guard exists to catch.
+    """
     _need_bpy("mesh_volume")
     bm = bmesh.new()
     bm.from_mesh(obj.data)
-    bmesh.ops.triangulate(bm, faces=bm.faces)
-    total = 0.0
-    for f in bm.faces:
-        a, b, c = (v.co for v in f.verts)
-        total += a.dot(b.cross(c)) / 6.0
-    bm.free()
-    return total
+    try:
+        return _group_volume(bm.faces)  # fans n-gons itself; no triangulate needed
+    finally:
+        bm.free()
 
 
-def triangulate_and_purge(obj, null_volume=NULL_VOLUME):
-    """Triangulate, drop debris components, and assert the volume did not move.
+def triangulate_and_purge(obj, null_volume=NULL_VOLUME, expect_components=1,
+                          recalc_normals=False):
+    """Triangulate, drop debris components, and assert nothing real was removed.
 
-    The assertion is the point. A purge that changes the total volume removed
-    something real, and reporting the dropped volume separately is what lets that
-    be told apart from removing genuine debris.
+    `expect_components` is how many connected components the caller expects to
+    survive: 1 for an ordinary solid, N for a plate of N coupons, and 1 + K for a
+    vessel with K sealed cavities — a cavity is a component in its own right, with
+    negative signed volume. Pass None to skip the count assertion.
+
+    Declaring the count is worth strictly more than permitting any count. It catches
+    a plug fused to its socket, which *lowers* the number, exactly as readily as it
+    catches stray debris, which raises it. A boolean flag can only ever express one
+    of those.
+
+    `recalc_normals` defaults to False for the reason spelled out on `clean_mesh`.
+    This function reoriented unconditionally too, which is the same defect one stage
+    later and directly on the export path: a vessel that survived every earlier stage
+    was solidified here, on its way to disk.
+
+    `volume` is the sum over surviving components, so for a vessel it is the material
+    volume — outer minus cavity — and is the number a mass estimate should use.
     """
     _need_bpy("triangulate_and_purge")
     bm = bmesh.new()
@@ -824,63 +1277,124 @@ def triangulate_and_purge(obj, null_volume=NULL_VOLUME):
     for vol, g in vols:
         (kept if abs(vol) > null_volume else dropped).append((vol, g))
 
-    if len(kept) != 1:
+    if expect_components is not None and len(kept) != expect_components:
         bm.free()
         raise RuntimeError(
-            f"triangulate_and_purge: expected 1 solid component, found {len(kept)} "
-            f"with volumes {[round(v, 6) for v, _ in kept]}"
+            f"triangulate_and_purge: expected {expect_components} component(s), found "
+            f"{len(kept)} with volumes {[round(v, 6) for v, _ in kept]}. "
+            f"A plate of N coupons wants expect_components=N; a vessel with a sealed "
+            f"cavity wants 1 + K, the cavity being the negative-volume component."
         )
 
     vol_before = sum(v for v, _ in vols)
     for _, g in dropped:
         bmesh.ops.delete(bm, geom=list(g), context="FACES")
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    if recalc_normals:
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
     bm.to_mesh(obj.data)
     stats = {
         "triangles": len(bm.faces),
+        "triangles_kept": sum(len(g) for _, g in kept),
         "components": len(groups),
+        "kept_components": len(kept),
         "dropped_components": len(dropped),
-        "volume": kept[0][0],
+        "dropped_faces": sum(len(g) for _, g in dropped),
+        "volume": sum(v for v, _ in kept),
         "volume_dropped": sum(v for v, _ in dropped),
+        "component_volumes": [round(v, 6) for v, _ in kept],
     }
     bm.free()
 
-    if abs(stats["volume"] - vol_before) > max(1e-6, abs(vol_before) * 1e-9) + abs(stats["volume_dropped"]):
+    # Each dropped component is individually under null_volume by construction, so
+    # what is worth asserting is that they did not add up to something real - a part
+    # shedding a thousand slivers has lost a feature, not debris.
+    slack = max(1e-6, abs(vol_before) * 1e-9)
+    if abs(stats["volume_dropped"]) > slack:
         raise RuntimeError(
-            f"triangulate_and_purge changed the solid: {vol_before:.6f} -> "
-            f"{stats['volume']:.6f}, dropped {stats['volume_dropped']:.6f}"
+            f"triangulate_and_purge dropped {stats['volume_dropped']:.6f} mm^3 across "
+            f"{len(dropped)} component(s), above the {slack:.3e} tolerance; that is "
+            f"geometry, not debris. Total before {vol_before:.6f}, kept "
+            f"{stats['volume']:.6f}."
         )
     return stats
 
 
 def _face_groups(bm):
-    """Connected components of faces, by shared vertices."""
-    seen, groups = set(), []
+    """Faces grouped into bodies the way a SLICER groups them: adjacency only
+    across edges that have exactly two faces.
+
+    An edge with four faces is not a join, it is a fault, so anything hanging off
+    the solid through one of those is correctly seen as a separate body rather than
+    as part of it. That is the whole reason for this convention rather than "share
+    any edge": it is what makes null debris fall out as its own component instead of
+    hiding inside the shell.
+
+    The previous implementation here walked every `edge.link_faces` regardless of
+    count, and its docstring said "by shared vertices" while doing neither. It
+    therefore absorbed a back-to-back flap into the body across the very four-face
+    edge that is this plugin's founding defect -- the one Bambu Studio refused to
+    slice while the gate reported zero.
+    """
+    parent = list(range(len(bm.faces)))
+
+    def find(a):
+        while parent[a] != a:
+            parent[a] = parent[parent[a]]
+            a = parent[a]
+        return a
+
+    for e in bm.edges:
+        if len(e.link_faces) == 2:
+            ra, rb = find(e.link_faces[0].index), find(e.link_faces[1].index)
+            if ra != rb:
+                parent[rb] = ra
+    groups = {}
     for f in bm.faces:
-        if f in seen:
-            continue
-        stack, group = [f], set()
-        while stack:
-            cur = stack.pop()
-            if cur in group:
-                continue
-            group.add(cur)
-            for e in cur.edges:
-                for nb in e.link_faces:
-                    if nb not in group:
-                        stack.append(nb)
-        seen |= group
-        groups.append(group)
-    return groups
+        groups.setdefault(find(f.index), []).append(f)
+    return list(groups.values())
 
 
 def _group_volume(faces):
+    """Enclosed volume by the divergence theorem. Near zero for anything that does
+    not enclose, which is exactly the discriminator the purge needs.
+
+    Two details that are not fussiness, and that this function did not have until a
+    real build tripped over both. The sum is taken about the component's **own
+    centroid**, and in **float64**.
+
+    Done the obvious way -- mathutils vectors about the world origin -- a
+    back-to-back pair of triangles 23 mm out came back at 9.5e-06 mm^3 rather than
+    zero, because `mathutils` is SINGLE precision and the two tetrahedra are ~60 mm^3
+    each cancelling to nothing. 9.5e-06 is simply float32 epsilon at that magnitude.
+    That is above `NULL_VOLUME`, so null debris read as a second solid body and
+    aborted an otherwise correct build.
+
+    Recentring removes the cancellation and, for a closed surface, changes nothing:
+    the integral is translation-invariant. float64 removes the rest. The same pair
+    then measures ~1e-15.
+    """
+    verts = {id(v): v for f in faces for v in f.verts}.values()
+    n = len(verts)
+    if not n:
+        return 0.0
+    ox = sum(float(v.co.x) for v in verts) / n
+    oy = sum(float(v.co.y) for v in verts) / n
+    oz = sum(float(v.co.z) for v in verts) / n
     total = 0.0
     for f in faces:
         vs = list(f.verts)
-        a = vs[0].co
+        ax = float(vs[0].co.x) - ox
+        ay = float(vs[0].co.y) - oy
+        az = float(vs[0].co.z) - oz
         for i in range(1, len(vs) - 1):
-            total += a.dot(vs[i].co.cross(vs[i + 1].co)) / 6.0
+            bx = float(vs[i].co.x) - ox
+            by = float(vs[i].co.y) - oy
+            bz = float(vs[i].co.z) - oz
+            cx = float(vs[i + 1].co.x) - ox
+            cy = float(vs[i + 1].co.y) - oy
+            cz = float(vs[i + 1].co.z) - oz
+            total += (ax * (by * cz - bz * cy) - ay * (bx * cz - bz * cx)
+                      + az * (bx * cy - by * cx)) / 6.0
     return total
 
 
@@ -1039,7 +1553,9 @@ def export_stl(obj, filepath, rotate_euler=None, drop_to_bed=True, centre_xy=Tru
         purge("_tmp_export")
 
 
-def gated_export(obj, filepath, accept, rotate_euler=None, weld=WELD_POSITIONAL):
+def gated_export(obj, filepath, accept, rotate_euler=None, weld=WELD_POSITIONAL,
+                 expect_solids=1, expect_cavities=0, expect=None,
+                 wall_samples=0, build_axis="z", overhang_deg=45.0):
     """Export only if `accept` passed, then re-verify the bytes and delete on failure.
 
     Three properties worth stating, because each one closes a real hole:
@@ -1051,6 +1567,20 @@ def gated_export(obj, filepath, accept, rotate_euler=None, weld=WELD_POSITIONAL)
     - On file-level failure the file is deleted. There is an unavoidable window in
       which an unverified file exists on disk; deleting on failure closes it, and
       is simpler to reason about than write-to-temp-then-rename.
+
+    `expect_solids` and `expect_cavities` declare the shape of the artifact: one
+    positive shell and no cavities for an ordinary part, N and 0 for a plate of
+    coupons, 1 and K for a vessel. Both were previously fixed at 1 and 0 with no way
+    to say otherwise, which made a plate and a hollow part equally unexportable —
+    the hollow one being rejected as `inverted_bodies: got 1, want 0`, i.e. for the
+    one property that proved it was built correctly.
+
+    `expect`, `wall_samples`, `build_axis` and `overhang_deg` reach the file tier
+    instead of being pinned here. `wall_samples` in particular defaulted to 0, which
+    returns `{"available": False}` and disabled the file tier's only physical
+    measurement at every call site in the plugin, with no caller able to turn it on.
+    It still defaults to 0 because it is slow; the difference is that it is now a
+    choice someone can make.
     """
     _need_bpy("gated_export")
     if not accept.ok:
@@ -1062,8 +1592,11 @@ def gated_export(obj, filepath, accept, rotate_euler=None, weld=WELD_POSITIONAL)
     info = export_stl(obj, filepath, rotate_euler=rotate_euler)
 
     mesh_audit = _load_mesh_audit()
-    report = mesh_audit.audit(filepath, weld, 0, "z", 45.0, 4)
-    faults = mesh_audit.acceptance(report, {}, allow_multi_body=False)
+    report = mesh_audit.audit(filepath, weld, wall_samples, build_axis, overhang_deg, 4)
+    faults = mesh_audit.acceptance(
+        report, expect or {},
+        expect_solids=expect_solids, expect_cavities=expect_cavities,
+    )
     if faults:
         os.remove(filepath)
         return {"exported": False, "reason": "file checks failed",
@@ -1071,4 +1604,6 @@ def gated_export(obj, filepath, accept, rotate_euler=None, weld=WELD_POSITIONAL)
 
     info["vertex_digest"] = report["vertex_digest"]
     info["volume"] = report["topology"]["volume"]
+    info["bodies"] = report["topology"]["bodies"]
+    info["cavities"] = report["topology"]["inverted_bodies"]
     return {"exported": True, "info": info}

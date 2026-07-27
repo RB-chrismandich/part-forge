@@ -1,0 +1,260 @@
+{
+  "acceptance": {
+    "checks": [
+      {
+        "got": 1,
+        "kind": "exact",
+        "name": "solids",
+        "ok": true,
+        "tol": 0.0,
+        "want": 1,
+        "why": "one printed shell"
+      },
+      {
+        "got": 1,
+        "kind": "exact",
+        "name": "cavities",
+        "ok": true,
+        "tol": 0.0,
+        "want": 1,
+        "why": "the sealed void. A zero here means the cavity was flipped outward and the part is now solid -- the failure this fixture exists to catch"
+      },
+      {
+        "got": 0,
+        "kind": "exact",
+        "name": "open_edges",
+        "ok": true,
+        "tol": 0.0,
+        "want": 0,
+        "why": ""
+      },
+      {
+        "got": 0,
+        "kind": "exact",
+        "name": "over_edges",
+        "ok": true,
+        "tol": 0.0,
+        "want": 0,
+        "why": ""
+      },
+      {
+        "got": 0,
+        "kind": "exact",
+        "name": "winding_flips",
+        "ok": true,
+        "tol": 0.0,
+        "want": 0,
+        "why": ""
+      },
+      {
+        "got": 0,
+        "kind": "exact",
+        "name": "degenerate_faces",
+        "ok": true,
+        "tol": 0.0,
+        "want": 0,
+        "why": ""
+      },
+      {
+        "got": 1,
+        "kind": "exact",
+        "name": "genus",
+        "ok": true,
+        "tol": 0.0,
+        "want": 1,
+        "why": "the drain slot puts one handle through the dish. NOT the hole count: the sealed void adds none and a bowl open at the top adds none"
+      },
+      {
+        "got": 23924.414240014205,
+        "kind": "floor",
+        "name": "volume",
+        "ok": true,
+        "tol": null,
+        "want": ">= 1.0",
+        "why": ""
+      },
+      {
+        "got": 1.0,
+        "kind": "tight",
+        "name": "rim_slope_is_45deg",
+        "ok": true,
+        "tol": 0.002,
+        "want": 1.0,
+        "why": "the point of the rim: at 45 degrees a naive in-plane inset leaves wall*cos(45), a 29% error rather than the 2% a near-vertical wall hides"
+      },
+      {
+        "got": 1.999998076057434,
+        "kind": "explicit",
+        "name": "rim_wall_perpendicular",
+        "ok": true,
+        "tol": 0.06,
+        "want": 2.0,
+        "why": "worst of 24 stations along the surface normal. An in-plane inset would read 1.414 mm here"
+      },
+      {
+        "got": 5.999999864196777,
+        "kind": "explicit",
+        "name": "floor_thickness",
+        "ok": true,
+        "tol": 0.02,
+        "want": 6.0,
+        "why": "the floor is not the wall; defaulting it to the wall inset was a defect in its own right"
+      },
+      {
+        "got": 1,
+        "kind": "exact",
+        "name": "aperture_was_cut",
+        "ok": true,
+        "tol": 0.0,
+        "want": 1,
+        "why": "None means the slot never opened through the floor"
+      },
+      {
+        "got": 1,
+        "kind": "exact",
+        "name": "raster_hit_the_part",
+        "ok": true,
+        "tol": 0.0,
+        "want": 1,
+        "why": "every ray passing means the raster was aimed past the dish, so 'nothing blocked it' and 'it went through the slot' would be the same reading"
+      },
+      {
+        "got": 3.9000000000000004,
+        "kind": "explicit",
+        "name": "drain_aperture_w",
+        "ok": true,
+        "tol": 0.100000001,
+        "want": 4.0,
+        "why": "clear width through the floor. Biased low by up to one ray pitch per side, never high"
+      }
+    ],
+    "failures": [],
+    "near_limit": [],
+    "notes": [
+      {
+        "got": "1659/3381 passed",
+        "kind": "note",
+        "name": "aperture_rays",
+        "ok": null,
+        "tol": null,
+        "want": null,
+        "why": ""
+      },
+      {
+        "got": 8288,
+        "kind": "note",
+        "name": "triangles",
+        "ok": null,
+        "tol": null,
+        "want": null,
+        "why": ""
+      },
+      {
+        "got": [
+          23996.41424,
+          -72.0
+        ],
+        "kind": "note",
+        "name": "component_volumes",
+        "ok": null,
+        "tol": null,
+        "want": null,
+        "why": ""
+      },
+      {
+        "got": 23924.4142,
+        "kind": "note",
+        "name": "material_volume_mm3",
+        "ok": null,
+        "tol": null,
+        "want": null,
+        "why": ""
+      }
+    ],
+    "ok": true,
+    "tag": "GateCouponDish"
+  },
+  "built": "2026-07-26",
+  "export": {
+    "exported": true,
+    "info": {
+      "bodies": 2,
+      "cavities": 1,
+      "dims": [
+        84.0,
+        84.0,
+        18.0
+      ],
+      "tris": 8288,
+      "vertex_digest": "964be23728bc126c0f7c06eafca0ce6f",
+      "volume": 23924.414240014205
+    }
+  },
+  "parameters": {
+    "FLOOR_T": 6.0,
+    "H_TOTAL": 18.0,
+    "RIM_SLOPE": 1.0,
+    "R_BASE": 30.0,
+    "R_RIM": 42.0,
+    "SEG_LOFT": 24,
+    "SEG_RING": 96,
+    "SLOT_L": 12.0,
+    "SLOT_W": 4.0,
+    "VOID_H": 2.0,
+    "VOID_R": 18.0,
+    "VOID_W": 6.0,
+    "VOID_Z": 2.0,
+    "WALL": 2.0,
+    "Z_FLARE": 6.0
+  },
+  "part": "GateCouponDish",
+  "purge": {
+    "component_volumes": [
+      23996.41424,
+      -72.0
+    ],
+    "components": 2,
+    "dropped_components": 0,
+    "dropped_faces": 0,
+    "kept_components": 2,
+    "triangles": 8288,
+    "triangles_kept": 8288,
+    "volume": 23924.414240014194,
+    "volume_dropped": 0
+  },
+  "topology": {
+    "bodies": 2,
+    "body_detail": [
+      {
+        "edges": 12414,
+        "euler": 0,
+        "faces": 8276,
+        "signed_volume": 23996.414240014205,
+        "verts": 4138
+      },
+      {
+        "edges": 18,
+        "euler": 2,
+        "faces": 12,
+        "signed_volume": -72.0,
+        "verts": 8
+      }
+    ],
+    "degenerate_faces": 0,
+    "degenerate_repeated_id": 0,
+    "degenerate_zero_area": 0,
+    "edges": 12432,
+    "euler": 2,
+    "faces": 8288,
+    "genus": 1,
+    "inverted_bodies": 1,
+    "null_volume_bodies": 0,
+    "open_edges": 0,
+    "over_edges": 0,
+    "vertex_digest": "964be23728bc126c0f7c06eafca0ce6f",
+    "verts": 4146,
+    "volume": 23924.414240014205,
+    "weld_boundary_risk": 4126,
+    "winding_flips": 0
+  }
+}

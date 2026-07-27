@@ -471,6 +471,29 @@ import bpy
 import bmesh
 from mathutils import Matrix, Vector
 
+
+def _load_part_kit():
+    """Import the shipped kit, so this fixture exercises the code the plugin ships.
+
+    Only the CONSTRUCTION half of this file delegates to `part_kit`, and currently
+    only `boolean`.  The verification half below -- `stl_triangles`, `stl_manifold`,
+    `stl_acceptance` -- must stay an independent implementation; see the note above
+    `stl_manifold`.
+
+    Resolved from this file's own location rather than the working directory,
+    because a generator is run from wherever the caller happens to be.
+    """
+    here = os.path.dirname(os.path.abspath(__file__))
+    cand = os.environ.get("PART_FORGE_SCRIPTS") or os.path.normpath(
+        os.path.join(here, "..", "..", "plugins", "part-forge", "scripts"))
+    if cand not in sys.path:
+        sys.path.insert(0, cand)
+    import part_kit
+    return part_kit
+
+
+_kit = _load_part_kit()
+
 MM_PER_IN = 25.4
 MM2_PER_IN2 = MM_PER_IN ** 2
 
@@ -1283,27 +1306,26 @@ def hull_solid(name, rings):
 
 
 def boolean(target, cutter, operation, solver='MANIFOLD'):
-    """Apply a boolean via the depsgraph -- no operator context needed.
+    """Apply a boolean, delegating the guard to part_kit.
 
-    The MANIFOLD solver rejects non-manifold operands by passing the target
-    through UNCHANGED and reporting nothing.  That silent no-op is exactly how
-    the fit gauge lost its labels once, so refuse to tolerate it: if the vertex
-    count did not move, retry on EXACT and then insist the mesh really changed.
+    This used to guard on VERTEX COUNT: retry on EXACT if the count did not move,
+    and raise if it still did not.  That catches the silent no-op -- the failure
+    that once cost the fit gauge its labels -- but not the worse one beside it.
+    When the MANIFOLD solver DECLINES, the failed modifier still bakes and merges
+    the cutter in as a second closed shell.  The vertex count moves, so a
+    "did anything change" guard accepts it on the first attempt and never reaches
+    the EXACT retry that would have worked.  part_kit.boolean tests the SIGN of the
+    signed-volume change against the operation instead, which is the same guard this
+    file's `_signed_volume` docstring reasons about, and it raises with the cutter's
+    own volume so the `target + cutter` merge signature is visible on first read.
+
+    Delegated rather than reimplemented because the kit's version is strictly
+    stronger and this file is the repository's regression fixture: routing the
+    fixture's booleans through the shipped code is what makes the pinned digest
+    capable of noticing a kit regression at all.  Verified digest-neutral before
+    landing -- all three variants reproduce byte-identical geometry.
     """
-    before = len(target.data.vertices)
-    _apply_boolean(target, cutter, operation, solver)
-    if len(target.data.vertices) != before:
-        return target
-    if solver != 'EXACT':
-        _apply_boolean(target, cutter, operation, 'EXACT')
-        if len(target.data.vertices) != before:
-            print(f"  [boolean] {operation} on {target.name}: "
-                  f"{solver} was a no-op, EXACT succeeded")
-            return target
-    raise RuntimeError(
-        f"boolean {operation} of {cutter.name} into {target.name} changed nothing "
-        f"({before} verts before and after) -- operands do not overlap, or both "
-        f"solvers rejected them")
+    return _kit.boolean(target, cutter, operation, solver=solver)
 
 
 def round_edges(obj, g=None, radius=None, segments=None, angle_deg=None, tol=1.0e-6):
@@ -3245,6 +3267,21 @@ def _weld_ids(points, tol):
             remap[r] = len(remap)
     return [remap[find(i)] for i in ids], len(remap)
 
+
+# ---------------------------------------------------------------------------
+# DO NOT DEDUPLICATE ANYTHING BELOW THIS LINE AGAINST part_kit OR mesh_audit.
+#
+# It looks like obvious duplication and it is the opposite.  This half re-opens
+# the exported BYTES, rebuilds topology by position from scratch, and computes its
+# own vertex digest, sharing no code with either shipped auditor.  That makes it a
+# genuine third opinion on the same artifact -- which is the whole method this
+# repository is built on, and the reason `inspect_model.py` and `mesh_audit.py`
+# overlap on purpose.  CLAUDE.md puts it plainly: if either ever imports the other,
+# the evidence is gone.
+#
+# The construction half above may delegate to part_kit, and does.  This half may
+# not.  A regression fixture whose verifier is the code under test proves nothing.
+# ---------------------------------------------------------------------------
 
 def stl_manifold(path, weld=None):
     """Is the file on disk watertight BY POSITION?  Counts, not opinions.

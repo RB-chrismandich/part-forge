@@ -35,10 +35,11 @@ tier is the one that decides.
 | over-used edges | 0 | structural | undirected edge used by three or more triangles | the fault that shipped: coincident shells or a self-touch |
 | winding flips | 0 | structural | a directed edge traversed twice | inside and outside are ambiguous; normals cannot be trusted |
 | degenerate faces | 0 | structural | repeated vertex id, or zero area after welding | slicers divide by the face normal |
-| bodies / solids | 1 | structural | connected components over welded vertices | stray shells print as debris; `saddle_h+2` shipped 3 components until the purge dropped 2 |
+| solids | declared, default 1 | structural | connected components with POSITIVE signed volume | stray shells print as debris; `saddle_h+2` shipped 3 components until the purge dropped 2. Declare N for a plate of coupons -- an exact count also catches two parts fused into one, which a permissive flag cannot |
+| cavities | declared, default 0 | structural | connected components with NEGATIVE signed volume | a sealed void inside the material. Undeclared it means the solid is inside out; declared it is what makes a vessel legal. `bodies = solids + cavities` |
 | Euler characteristic | even, <= 2 per body | structural | V - E + F on welded topology | a closed orientable surface has euler = 2 - 2g; odd means torn or non-orientable |
-| genus = (2*bodies - euler)/2 | reported; gate when the hole count is known | declared | derived from Euler | counts through-holes. Do NOT gate at genus 0: a plate with two bolt holes is legitimately genus 2 and euler -2. Gating euler at 2 rejects most real brackets, and a gate that fails a sound part is as useless as one that passes a broken one |
-| signed volume | > 0 | structural | divergence theorem over triangles | negative means the solid is inside out |
+| genus = (2*bodies - euler)/2 | reported; gate when the hole count is known | declared | derived from Euler | counts through-holes. Do NOT gate at genus 0: a plate with two bolt holes is legitimately genus 2 and euler -2. Gating euler at 2 rejects most real brackets, and a gate that fails a sound part is as useless as one that passes a broken one. **Genus is not the hole count for a vessel**: a hollow shell with two openings is a pipe, genus 1, whatever its bore count |
+| total signed volume | > 0 | structural | divergence theorem over triangles, summed over every shell | zero or negative means the part encloses no material, or a cavity is larger than the shell containing it. Asserted directly now that cavities are legal; it used to be implied by gating every body positive |
 | null-volume bodies | 0 | structural | per-body volume below 1e-6 mm^3 | a closed shell enclosing nothing |
 | minimum edge length | > 2e-3 mm | tight | shortest welded edge | example 5.05e-3 mm; below the floor, slicers emit arc-fitting errors |
 | loose vertices | 0 | structural | vertices in no face | harmless in the viewport, noise on export |

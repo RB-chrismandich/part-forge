@@ -22,6 +22,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PF="$ROOT/plugins/part-forge/scripts"
 PT="$ROOT/plugins/print-tune-bambu/skills/print-tune-bambu/scripts"
 FIXTURE="$ROOT/projects/shade-bar-mount"
+VESSEL="$ROOT/projects/gate-coupon-dish"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
@@ -37,6 +38,13 @@ SKIP=0
 # which is either the point of your commit or a bug, and never a surprise.
 readonly EXPECT_DIGEST="a916d985268c8921fff6f15315bc8e74"
 readonly EXPECT_VOLUME="32953.0289"
+
+# The vessel fixture. A SOLID part cannot exercise a cavity, so the saddle above
+# is blind to every hollow-geometry defect in .claude/HARNESS-LEDGER.md. These
+# numbers are the ones that move if any of them comes back.
+readonly VESSEL_DIGEST="964be23728bc126c0f7c06eafca0ce6f"
+readonly VESSEL_VOLUME="23924.4142"
+readonly VESSEL_CAVITY_MM3="72.0"       # 6 x 6 x 2 sealed void, negative shell
 
 ok()   { PASS=$((PASS + 1)); printf '  ok    %s\n' "$1"; }
 # check <label> [detail]  -- consumes the exit status of the previous command.
@@ -132,6 +140,63 @@ else
 fi
 
 # --------------------------------------------------------------------------- #
+# 4b. The vessel fixture. Its whole reason for existing is that a solid part
+#     cannot fail the way a hollow one can: a flipped cavity keeps every
+#     structural number identical -- bodies, open edges, winding flips, genus --
+#     and changes only the signed volume and the cavity count.
+#
+#     The independent check is the load-bearing one. inspect_model.py shares no
+#     code with mesh_audit, has its own STL loader, and sums signed tetrahedra
+#     over every triangle. A correct sealed cavity contributes NEGATIVE volume,
+#     so flipping it outward moves inspect_model's answer by twice the cavity --
+#     144 mm^3 here. That is full detection of the worst defect in the ledger by
+#     code that has never heard of bodies, cavities or the body model.
+# --------------------------------------------------------------------------- #
+echo
+echo "vessel fixture"
+python3 "$PF/mesh_audit.py" "$VESSEL/gate_coupon_dish.stl" --quiet \
+    --json "$TMP/v.json" >/dev/null 2>&1
+python3 "$PT/inspect_model.py" "$VESSEL/gate_coupon_dish.stl" >"$TMP/vi.json" 2>/dev/null
+python3 - "$TMP/v.json" "$TMP/vi.json" "$VESSEL_DIGEST" "$VESSEL_VOLUME" \
+         "$VESSEL_CAVITY_MM3" <<'PYEOF'
+import json, sys
+ma = json.load(open(sys.argv[1]))
+im = list(json.load(open(sys.argv[2])).values())[0]
+want_d, want_v, cav = sys.argv[3], float(sys.argv[4]), float(sys.argv[5])
+t = ma["topology"]
+bad = []
+if ma["vertex_digest"] != want_d:
+    bad.append(f"digest {ma['vertex_digest']} != {want_d}")
+if abs(t["volume"] - want_v) > 1e-3:
+    bad.append(f"volume {t['volume']:.4f} != {want_v}")
+if t["bodies"] - t["inverted_bodies"] != 1:
+    bad.append(f"solids {t['bodies'] - t['inverted_bodies']} != 1")
+if t["inverted_bodies"] != 1:
+    bad.append(f"cavities {t['inverted_bodies']} != 1 -- the sealed void was lost")
+if t["genus"] != 1:
+    bad.append(f"genus {t['genus']} != 1")
+# The independent opinion, and the one that catches a flipped cavity.
+v_im = im["volume_cm3"] * 1000.0
+if abs(v_im - want_v) > 0.5:
+    flipped = abs(v_im - (want_v + 2.0 * cav)) < 0.5
+    bad.append(f"inspect_model {v_im:.4f} != {want_v}"
+               + (" -- exactly +2x the cavity: it was flipped outward" if flipped else ""))
+if bad:
+    print("; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PYEOF
+check "vessel digest, cavity and genus hold" "the hollow fixture moved -- see stderr"
+
+python3 - "$TMP/v.json" <<'PYEOF'
+import json, sys
+t = json.load(open(sys.argv[1]))["topology"]
+vols = sorted(b["signed_volume"] for b in t["body_detail"])
+sys.exit(0 if vols and vols[0] < 0 and abs(vols[0] + 72.0) < 1e-6 else 1)
+PYEOF
+check "the sealed void is still a negative shell of 72 mm^3" \
+      "the cavity is gone, flipped, or resized"
+
+# --------------------------------------------------------------------------- #
 # 5. JSON contract. These keys are quoted by skills and by the sibling plugin;
 #    renaming one is a breaking change that nothing else would catch.
 # --------------------------------------------------------------------------- #
@@ -223,12 +288,50 @@ fi
 
 # --------------------------------------------------------------------------- #
 # 10. The sibling plugin's model inspector reads the same file independently.
-#     Its agreement with mesh_audit is the cross-check the repo is built on.
+#     Its agreement with mesh_audit is the cross-check the repo is built on --
+#     so it is asserted here in numbers. It used to be asserted in this comment
+#     and nowhere else: the only check was that inspect_model exited 0, which it
+#     would do while disagreeing about every quantity it measures.
+#
+#     The two share no code and do not even agree on method. inspect_model has
+#     its own STL loader and quantises positions to 3 decimal places;
+#     mesh_audit welds at 1e-4 mm. That the numbers still land on top of each
+#     other is what makes the agreement evidence rather than tautology.
 # --------------------------------------------------------------------------- #
 echo
 echo "cross-plugin agreement"
 expect_exit 0 "inspect_model reads the fixture" \
     python3 "$PT/inspect_model.py" "$FIXTURE/saddle_h0.stl"
+
+python3 "$PT/inspect_model.py" "$FIXTURE/saddle_h0.stl" >"$TMP/im.json" 2>/dev/null
+python3 "$PF/mesh_audit.py" "$FIXTURE/saddle_h0.stl" --json "$TMP/ma.json" --quiet >/dev/null 2>&1
+python3 - "$TMP/im.json" "$TMP/ma.json" <<'PY'
+import json, sys
+im = list(json.load(open(sys.argv[1])).values())[0]
+ma = json.load(open(sys.argv[2]))
+t = ma["topology"]
+# inspect_model reports cm^3 and takes abs(); mesh_audit reports signed mm^3.
+v_im = im["volume_cm3"] * 1000.0
+v_ma = abs(t["volume"])
+bad = []
+if abs(v_im - v_ma) > 0.5:
+    bad.append(f"volume {v_im:.4f} vs {v_ma:.4f} mm^3")
+if im["triangles"] != ma["triangles_raw"]:
+    bad.append(f"triangles {im['triangles']} vs {ma['triangles_raw']}")
+if im["open_edges"] != t["open_edges"]:
+    bad.append(f"open_edges {im['open_edges']} vs {t['open_edges']}")
+if im["degenerate_triangles"] != t["degenerate_faces"]:
+    bad.append(f"degenerate {im['degenerate_triangles']} vs {t['degenerate_faces']}")
+d_im = [im["dims_mm"][k] for k in ("x", "y", "z")]
+d_ma = ma["bounds"]["dims"]
+if any(abs(a - b) > 1e-3 for a, b in zip(d_im, d_ma)):
+    bad.append(f"dims {d_im} vs {d_ma}")
+if bad:
+    print("; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+check "inspect_model and mesh_audit agree on the same bytes" \
+      "the two independent implementations disagree -- see stderr above"
 
 # --------------------------------------------------------------------------- #
 echo

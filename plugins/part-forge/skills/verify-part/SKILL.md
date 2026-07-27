@@ -33,8 +33,13 @@ Useful flags:
 - `--build-axis {x,y,z} --overhang-deg N` — overhang is measured against the build direction, so
   this must match how the part will actually be placed on the bed. Getting it wrong makes the
   overhang number meaningless.
-- `--allow-multi-body` — only when several shells are genuinely intended. Otherwise the default
-  fault is correct: stray shells print as debris.
+- `--expect-solids N --expect-cavities K` — declare the part's shape. A solid is `1 0`, a
+  plate of ten coupons is `10 0`, a vessel is `1 K` where each cavity is a shell with negative
+  signed volume. Prefer these to `--allow-multi-body`: an exact count also catches two parts
+  fused into one, which lowers the count, and a permissive flag never can.
+- `--allow-multi-body` — the older, weaker form, meaning "do not gate the solid count" at all.
+  Reach for it only when the number genuinely is not predictable. Otherwise the default fault
+  is correct: stray shells print as debris.
 - `--weld MM` — the positional weld tolerance, default 1e-4 mm. If `weld_boundary_risk` comes
   back non-zero, re-run at a different tolerance before trusting the unique-vertex counts.
 - `--expect PATH=VAL~TOL` or `--expect-file expect.json` — assert against the parameter table,

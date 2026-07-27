@@ -731,26 +731,43 @@ def check_gitignore_twin(root: Path, rep: Report) -> None:
 
 
 def check_fixture(root: Path, rep: Report) -> None:
-    """The dogfood project is the only fixture the scripts have.
+    """The dogfood projects are the only fixtures the scripts have.
 
-    If its artifacts go missing, every smoke check in this repo silently has
+    If their artifacts go missing, every smoke check in this repo silently has
     nothing to run against.
+
+    Every directory under `projects/` is checked, not a hard-coded one. This used
+    to name `shade-bar-mount` literally, and it is the only checker in this file
+    that looks at `projects/` at all -- so a second fixture could be added and the
+    gate would print CONSISTENT without ever having opened it. Reporting that as
+    evidence the fixture was wired in is the false green this repository catalogues.
     """
-    proj = root / "projects" / "shade-bar-mount"
-    if not proj.is_dir():
-        rep.warn("fixture", str(proj), "the worked-example project is absent")
+    projects_dir = root / "projects"
+    projects = sorted(p for p in projects_dir.glob("*") if p.is_dir())
+    if not projects:
+        rep.warn("fixture", str(projects_dir), "no worked-example project is present")
         return
-    for required in ("FACTS.md", "PROJECT.md", "BUILD-BRIEF.md", "verify_report.json"):
+    for proj in projects:
+        for required in ("FACTS.md", "PROJECT.md", "BUILD-BRIEF.md", "verify_report.json"):
+            rep.checks_run += 1
+            if not (proj / required).exists():
+                rep.error("fixture", str(proj / required), "fixture document is missing")
         rep.checks_run += 1
-        if not (proj / required).exists():
-            rep.error("fixture", str(proj / required), "fixture document is missing")
-    rep.checks_run += 1
-    if not list(proj.glob("*.stl")):
-        rep.error(
-            "fixture",
-            str(proj),
-            "no STL in the worked example -- the mesh scripts have nothing to verify against",
-        )
+        if not list(proj.glob("*.stl")):
+            rep.error(
+                "fixture",
+                str(proj),
+                "no STL in the worked example -- the mesh scripts have nothing to "
+                "verify against",
+            )
+        rep.checks_run += 1
+        if not list(proj.glob("*_gen.py")) and not list(proj.glob("*gen.py")):
+            rep.warn(
+                "fixture",
+                str(proj),
+                "no generator script -- the artifacts cannot be reproduced, so a "
+                "moved digest could never be attributed",
+            )
 
 
 # --------------------------------------------------------------------------- #
