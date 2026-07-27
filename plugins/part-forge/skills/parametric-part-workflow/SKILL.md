@@ -204,8 +204,8 @@ Precedence runs left to right: `FACTS.md` beats `PROJECT.md` beats the script be
   conditions, artifacts, and gates in one table.
 - `references/document-set.md` — what belongs in `FACTS.md` vs `PROJECT.md` vs
   `BUILD-BRIEF.md`, with the precedence rules and section skeletons.
-- `references/worked-example.md` — the shade-bar saddle traced through all eleven stages,
-  including each defect that was found and how.
+- `references/worked-example.md` and `references/worked-example-structural.md` — the shade-bar
+  saddle traced through all eleven stages, including each defect that was found and how.
 
 ## Related skills and commands
 

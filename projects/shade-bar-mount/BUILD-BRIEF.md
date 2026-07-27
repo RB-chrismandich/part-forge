@@ -1,5 +1,7 @@
 # Build Brief — Shade Bar Mid-Span Saddle
 
+<!-- doc-limit: 535 — single-shot handoff embedding its own correction history (struck-through claims, "previously said the opposite" blocks); splitting or trimming it breaks the one-shot contract and destroys the record, the same reason FACTS.md's supersession entries are kept rather than compressed. -->
+
 **Hand this file to Claude as the task.** It is self-contained: it assumes no prior conversation.
 
 ---
@@ -178,7 +180,7 @@ Committed values: `ROOT_BLEND` = 3.5, `R_ROOT` = 13.5, `R_ROOT_LOW` = 5.0, `FLAR
 ### The end closes — `FLARE_TIP`
 
 `hull_solid`'s outermost ring is a **flat planar cut normal to X**. The branch collar
-tapers its profile over the last `FLARE` mm and then the body simply stops: a square
+tapers its profile over the last `FLARE` mm and then the body stops: a square
 end cap whose rim meets the arm's upper surface at 93°, measured as a single 5.46 mm
 edge lying entirely in the plane X = 17.500. Anchoring the flare (below) nearly
 doubled it, because the anchors are held at full depth — the cap went from 7.4 mm
@@ -258,7 +260,7 @@ What bounds `R_ROOT` is the **mouth ramp**, and it is monotonic. Re-swept 12.0�
 across all three `H_DROP` variants after the FACTS §7i fix: **12.0 through 14.5 are clean**
 (165 `[PASS]`, 0 `[FAIL]`), and 14.75 and 15.0 fail one check — `mouth ramp -Y` at 95.45° and
 95.65° against its 89.1–93.7° bound, on `H_DROP` = 0. The mesh is *fine* at those radii; the
-fillet has simply grown far enough into the mouth to push the ramp out of spec. 13.5 sits
+fillet has grown far enough into the mouth to push the ramp out of spec. 13.5 sits
 mid-plateau with ~1 mm of headroom to a bound that degrades gradually and legibly rather than
 cliff-edged. Still re-run all three variants if you move it.
 

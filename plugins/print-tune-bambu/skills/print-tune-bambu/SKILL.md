@@ -17,8 +17,8 @@ settings that a named failure mode justifies.
 
 ## Pin down four facts before recommending anything
 
-Do not skip this. A settings answer with the wrong material in it is worse than
-no answer, because it looks authoritative.
+Do not skip this — a settings answer with the wrong material in it is worse
+than no answer, because it looks authoritative.
 
 1. **Printer and nozzle.** Default to the **Bambu Lab H2D with a 0.4 mm nozzle**
    unless told otherwise. If the part is abrasive-filled (CF/GF), confirm a
@@ -58,12 +58,11 @@ python3 $S/bambu_profiles.py user-list                                     # use
 
 `keys` marks each hit CONFIRMED (some stock preset sets it, so `get` returns a
 real stock value) or candidate (the key exists in Studio's option table but no
-preset overrides it, so there is no stock value to quote). Do not present a
-candidate key's value as "stock".
+preset overrides it — never present a candidate's value as "stock").
 
-Also run `user-list` early. If the user already keeps a preset for this material
-(they may have, for example, a PETG-CF one), inheriting from or aligning with it
-respects tuning they already trust, and reveals their house style.
+Also run `user-list` early: if the user already keeps a preset for this
+material, inheriting from or aligning with it respects tuning they already
+trust and reveals their house style.
 
 Filament-side values (nozzle temp, bed temp, chamber, cooling, flow, shrink) live
 in the filament preset: add `--kind filament`.
@@ -72,40 +71,22 @@ in the filament preset: add `--kind filament`.
 
 The preset files tell you what a setting *is set to*. They do not tell you what
 Bambu says a setting is *for*, or how to diagnose a symptom. `wiki_sync.py` keeps
-a local Markdown mirror of wiki.bambulab.com for exactly that.
+a local Markdown mirror of wiki.bambulab.com for exactly that — mechanics,
+scope, and the HMS error-code lookup are in `references/wiki-mirror.md`.
 
 ```bash
-python3 $S/wiki_sync.py status                 # is the mirror stale?
-python3 $S/wiki_sync.py sync                   # fetch only what changed
 python3 $S/wiki_sync.py grep 'first layer'     # search the local mirror
 python3 $S/wiki_sync.py show software/bambu-studio/layer-height
 python3 $S/wiki_sync.py search 'PETG warping'  # live wiki search index
 python3 $S/wiki_sync.py hms 0300_9500_0001_0005 --show   # printer error code
 ```
 
-`hms` normalizes whatever form the code arrives in — `HMS_0300-9500-0001-0005`,
-lowercase hex, or a partial `0300_9500` — because the printer screen, the wiki
-paths, and the page titles all format it differently. It ranks H2D-family pages
-first, since the same code is documented per model with different steps.
-
 **Staleness is handled for you.** A `PreToolUse` hook on the `Skill` tool runs
-`wiki_sync.py autorefresh` whenever this skill is invoked. It is throttled to one
-check per 24 h (a timestamp file short-circuits the rest at ~0.1 s), the check
-itself is a single GraphQL request, and if pages have changed it starts the sync
-detached and tells you so via injected context rather than blocking the turn.
-
-So do not run `status` reflexively. Read the injected note instead: if it says a
-background refresh just started, the new text is *not* in this turn's mirror —
-either re-read the page after it lands or flag the answer as possibly stale.
-Run `sync` yourself only when you need the fresh text right now.
-
-Prefer `grep`/`show` over `search`, since the mirror is local, complete for its
-scope, and quotable.
-
-The mirror is scoped by default to the sections that answer settings questions
-(`software`, `bambu-studio`, `knowledge-sharing`, `filament`, `filament-acc`,
-`h2`, `h2d`, `h2d-pro`, `general`, `ams*`, `parts-acc`, `studio-handy`, `miniwiki`) — about 1000 of the wiki's ~2500 English pages, ~10 MB. Use
-`--section x1,p1` or `--all-sections` when a question falls outside that.
+`wiki_sync.py autorefresh` whenever this skill is invoked, throttled to one
+check per 24 h. Read the injected note rather than running `status` reflexively:
+if it says a background refresh just started, the new text is *not* in this
+turn's mirror yet — re-read the page after it lands, or flag the answer as
+possibly stale. Run `sync` yourself only when you need the fresh text right now.
 
 When wiki guidance and a stock preset value disagree, the preset wins for "what
 is it set to" and the wiki wins for "what does it mean" — and it is worth saying
@@ -158,12 +139,12 @@ into "+32% time, +96% mass, inner wall +827 s, sparse infill −306 s". That is 
 trade the user was asked to accept, stated in the units they care about.
 
 **The H2D cannot be sliced this way.** The CLI has no flag to map filaments to
-nozzles, so any multi-extruder machine fails with `return_code -66`. Single-
-extruder machines (X1C, P1S, A1) work completely. On an H2D either pass a **3MF
-exported from Bambu Studio**, which carries the mapping the GUI assigned, or
-slice a single-extruder proxy and report the delta as *relative*. If you use a
-proxy, say so — a proxy number presented as an H2D number is exactly the kind of
-confident-wrong claim this whole skill exists to avoid.
+nozzles, so any multi-extruder machine fails with `return_code -66`; single-
+extruder machines (X1C, P1S, A1) work completely. On an H2D, pass a **3MF
+exported from Bambu Studio** (it carries the mapping the GUI assigned) or slice
+a single-extruder proxy and report the delta as *relative* — say so if you do,
+since a proxy number presented as an H2D number is exactly the confident-wrong
+claim this skill exists to avoid.
 
 ## Step 3 — choose the base preset, then change as little as possible
 
@@ -202,93 +183,17 @@ Two habits that separate good advice from generic advice:
   weak plane. For a loaded part, more `wall_loops` beats more
   `sparse_infill_density` per gram almost every time, and orientation beats both.
 
-## Step 5 — deliver both artifacts
+## Step 5 — deliver both artifacts, then validate
 
-Produce a decision brief with a delta table, **and** an importable preset JSON.
-The table is what gets read and argued with; the JSON is what gets used.
+Produce a decision brief with a delta table, **and** an importable preset JSON
+that matches Bambu Studio's own export format — a delta with `inherits`, not a
+full config. On the H2D, every speed/acceleration key is a 5-slot per-extruder-
+variant array; a bare string or wrong-length array imports but silently does
+not apply the way it reads.
 
-### The brief
-
-```markdown
-## <part> — <material> on <printer> <nozzle>
-
-**Base preset:** `<exact preset name>`
-**Filament preset:** `<exact filament preset name>`
-**Optimizing for:** <the stated priority> · **trading away:** <the stated cost>
-
-### What the geometry says
-<3-5 bullets citing measured numbers, or the assumed premises if no file>
-
-### Changes
-
-| Bambu Studio location | Setting | Stock | Set to | Why |
-|---|---|---|---|---|
-| Quality > Layer height | Layer height | 0.20 | 0.12 | <failure mode avoided> |
-
-### Left at stock on purpose
-<the tempting knobs you did not turn, and why — this is the part that keeps
-the profile honest and short>
-
-### Watch for
-<what to check on the first print, and what to change if it goes wrong>
-```
-
-### The preset JSON
-
-Match Bambu Studio's own export format exactly — a delta with `inherits`, not a
-full config:
-
-```json
-{
-  "name": "PETG-CF bracket 0.16",
-  "print_settings_id": "PETG-CF bracket 0.16",
-  "inherits": "0.16mm Balanced Quality @BBL H2D",
-  "from": "User",
-  "version": "<match the version field of an existing user preset>",
-  "wall_loops": "5",
-  "sparse_infill_density": "30%",
-  "outer_wall_speed": ["nil", "nil", "120", "nil", "nil"]
-}
-```
-
-**The H2D per-variant array is the thing that goes wrong.** On dual-nozzle
-machines, every speed and acceleration key is an array with one slot per extruder
-variant — five slots on the H2D, in the order given by `print_extruder_variant`:
-
-| Slot | Extruder | Variant |
-|---|---|---|
-| 0 | left (1) | Direct Drive Standard |
-| 1 | left (1) | Direct Drive High Flow |
-| 2 | right (2) | Direct Drive Standard |
-| 3 | right (2) | Direct Drive High Flow |
-| 4 | right (2) | Direct Drive TPU High Flow |
-
-`"nil"` means "inherit this slot". Writing `"outer_wall_speed": "120"` as a bare
-string, or an array of the wrong length, produces a preset that imports but does
-not apply the way it reads. Set the slots for the nozzle the filament is actually
-loaded in, and say in the brief which nozzle you assumed.
-
-## Step 6 — validate before handing it over
-
-```bash
-python3 $S/bambu_profiles.py validate /path/to/new-preset.json
-```
-
-This checks the required fields, that `inherits` names a preset that exists in
-this install, that every key appears in the base chain, and that per-variant
-arrays are the right length. Fix errors before presenting; surface warnings in
-the brief if they are intentional.
-
-To install it (only when the user asks — it writes into their Studio data dir,
-and Bambu Studio must be restarted to see it):
-
-```bash
-python3 $S/bambu_profiles.py install /path/to/new-preset.json --yes
-```
-
-Otherwise just write the file somewhere convenient and tell them to use
-Bambu Studio's **Process preset dropdown > Import** (or drop it in the directory
-that `root` printed).
+`references/output-format.md` has the brief template, the JSON example, the
+full per-variant slot table, and the `validate`/`install` commands to run
+before handing the preset over.
 
 ## Things that make the advice worse
 
@@ -306,6 +211,8 @@ that `root` printed).
 
 ## Reference files
 
+- `references/output-format.md` — the decision-brief template, the preset JSON
+  example, the full H2D per-variant slot table, and the validate/install commands.
 - `references/failure-modes.md` — symptom or requirement → the lever that fixes
   it, and why. Read this for anything beyond layer height and walls.
 - `references/settings-map.md` — Bambu Studio UI label ↔ JSON key, grouped by
@@ -320,28 +227,18 @@ that `root` printed).
   weekly refresh agent, and how to point a RAG index at it.
 - `references/slice-verification.md` — what the headless slicer reports, how to
   read a comparison, and the multi-extruder limitation in detail.
+- `references/generator-handoff.md` — reading a part-forge `verify_report.json`,
+  and why `inspect_model.py` and `mesh_audit.py` deliberately overlap.
 
 ## When the model came from a generator
 
-If the part was produced by a `part-forge` generator, a `verify_report.json` sits
-beside the STL and it has already measured most of what Step 2 asks for — wall
-thickness at the worst station, overhang area, volume, bounding box, and the load
-path's safety factor — against expected values, on the exported bytes. Read it
-before running `inspect_model.py`, and quote its numbers. It knows which station
-is the thin one; a fresh measurement does not.
-
-Two things it does *not* remove the need for. It says nothing about slicing: time,
-mass, and the slicer's own warnings still require a real slice. And its overhang
-figure is computed for the build axis the generator baked in, so if the part is
-being placed differently on the bed, that number does not transfer.
-
-`inspect_model.py` and part-forge's `mesh_audit.py` overlap deliberately. They are
-independent implementations reading the same file, and two tools agreeing from
-different evidence is a much stronger claim than either alone — the whole reason
-part-forge audits outside Blender is that a single implementation once passed 135
-checks on a file Bambu Studio refused to slice. When the two disagree, that
-disagreement is the finding. Do not average them; establish which one is measuring
-what the slicer will read.
+A `part-forge` generator leaves a `verify_report.json` beside the STL that has
+already measured most of what Step 2 asks for, on the exported bytes — read it
+before running `inspect_model.py` and quote its numbers. It does not remove the
+need for a real slice, and its overhang figure does not transfer if the part is
+placed differently than the generator's build axis. `references/generator-handoff.md`
+has the full handoff, including why `inspect_model.py` and part-forge's
+`mesh_audit.py` deliberately overlap.
 
 ## Related
 
