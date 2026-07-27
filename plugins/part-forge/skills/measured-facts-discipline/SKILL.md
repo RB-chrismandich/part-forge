@@ -159,7 +159,7 @@ Then re-validate the cross-check if any input to it later changes.
   "retrieval by twist-lock plug" were both written into one ledger, and a twist-lock plug is a
   second printed piece by definition — they disagreed from the moment the second was written.
   Read the two sections against each other, and when they collide the envelope loses: it is a
-  claim about the shell, not about the assembly. Note that the precedence rule does not settle
+  claim about the shell, not about the assembly. The precedence rule does not settle
   this. `FACTS.md` beats `PROJECT.md` orders *files*, and both of these live in the same file,
   so nothing in the contract adjudicates it and no structural gate can — `repo_check.py` was
   correctly silent throughout, because this is semantics.

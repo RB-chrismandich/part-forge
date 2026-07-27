@@ -34,7 +34,7 @@ listed here.
 
 | Contract | Producer | Consumer |
 |---|---|---|
-| `verify_report.json` shape and location beside the STL | part-forge generator | print-tune-bambu SKILL.md:326-336 |
+| `verify_report.json` shape and location beside the STL | part-forge generator | print-tune-bambu references/generator-handoff.md |
 | the string `print-tune-bambu` and the install id `print-tune-bambu@part-forge` | -- | 5 files inside part-forge |
 | `mesh_audit.py --json` top-level keys | part-forge | its own skills, and quoted by print-tune-bambu |
 | `inspect_model.py` and `mesh_audit.py` reading the same file **independently** | -- | the premise of the repository |

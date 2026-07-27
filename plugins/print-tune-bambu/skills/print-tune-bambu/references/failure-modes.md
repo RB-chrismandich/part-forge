@@ -28,8 +28,8 @@ setting you could change.
 5. `infill_wall_overlap` 15 % → 25–30 % so the infill actually bonds to the walls
    instead of resting against them.
 6. Filament side: raise `nozzle_temperature` 5–10 °C and cut cooling. Hotter and
-   slower welds layers better. This is the highest-leverage change for Z strength
-   and it lives in the filament preset, so it is easy to forget.
+   slower welds layers better. This is the highest-leverage change for Z strength,
+   and it lives in the filament preset — easy to overlook.
 7. `layer_height` down slightly — more layers means more interfaces but each weld
    is better and the cross-section is more uniform. Modest effect; do it last.
 

@@ -77,7 +77,7 @@ Default sections are the ones that answer settings questions:
 largely per-model packing, teardown, and replacement guides that add bulk to a
 RAG index without improving settings answers.
 
-Note that the wiki's top-level namespace is untidy: Bambu Studio material lives
+The wiki's top-level namespace is untidy: Bambu Studio material lives
 under both `software/` and `bambu-studio/`, and filament guides under both
 `filament/` and `filament-acc/`. If a `search` hit comes back without the `*`
 that marks a local copy, the section is missing from your scope — that is the

@@ -1,5 +1,9 @@
 # Construction idioms
 
+<!-- doc-type: reference -->
+<!-- A lookup catalog of idioms keyed by the failure each prevents; readers arrive at one
+     entry via search, not start-to-end, so this is a reference page, not an explanation. -->
+
 Each entry states the failure it prevents before the technique, because the technique is
 only memorable once the failure is. Working code for all of these is in
 `examples/generator_template.py`; the helpers live in `scripts/part_kit.py`.
