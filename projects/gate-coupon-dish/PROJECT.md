@@ -14,10 +14,10 @@ physical world; every dimension in it is a coverage choice.
 Give the repository a **hollow** fixture.
 
 The regression net was one solid part, `projects/shade-bar-mount/`, plus its pinned
-vertex digest. A solid part cannot exhibit the failures that dominate the harness
-ledger: `clean_mesh` turning a cavity inside out (#8), the gate rejecting a correct
-vessel as "inside out" (#10), an in-plane inset leaving `wall * cos(alpha)` (#5), an
-aperture measured by the material beside it rather than by what passes through (#4).
+vertex digest. A solid part cannot exhibit the failures that dominate this
+harness's history: `clean_mesh` turning a cavity inside out, the gate rejecting a
+correct vessel as "inside out", an in-plane inset leaving `wall * cos(alpha)`, and an
+aperture measured by the material beside it rather than by what passes through.
 
 Every one of those was found by hand, on a project living outside this repository. Not
 one of them could have been caught here. This part closes that.
@@ -51,7 +51,7 @@ fixture rather than merely overwriting it.
 merges it into the outer shell, leaving one body and no negative volume. A vessel with
 only an open bowl reports `inverted_bodies = 0` and cannot exercise `expect_cavities` at
 all -- the check would pass while measuring nothing, which is the failure class the
-whole ledger is about. Hence the open bowl *and* the sealed pedestal void.
+whole harness exists to prevent. Hence the open bowl *and* the sealed pedestal void.
 
 **3b. The rim angle is the experiment.** At 45 degrees the perpendicular and in-plane
 constructions differ by 29%. On a vertical wall they are identical, so a straight-sided

@@ -14,33 +14,33 @@ merely overwriting it.
 
 WHY THIS PART EXISTS
 --------------------
-`projects/shade-bar-mount/` is a solid. Every hollow-geometry defect in
-`.claude/HARNESS-LEDGER.md` -- the cavity `clean_mesh` turned inside out, the gate
-that rejected a correct vessel as "inside out", the in-plane inset that leaves
-`wall * cos(alpha)` -- is invisible on a solid part, and was therefore invisible to
-this repository's entire regression net. This is the vessel that makes them visible.
+`projects/shade-bar-mount/` is a solid. Every hollow-geometry defect this harness has
+actually shipped -- the cavity `clean_mesh` turned inside out, the gate that rejected a
+correct vessel as "inside out", the in-plane inset that leaves `wall * cos(alpha)` -- is
+invisible on a solid part, and was therefore invisible to this repository's entire
+regression net. This is the vessel that makes them visible.
 
 It is a real dish and it prints, but its FEATURES were chosen for coverage, and
 `FACTS.md` says so plainly rather than dressing them up as measured requirements.
-Four properties are load-bearing; each fails a different ledger entry if it moves:
+Four properties are load-bearing; each catches a different failure if it moves:
 
-  the 45-degree rim   #5   a naive in-plane inset leaves 1.414 mm of a 2.000 mm
-                           wall here. On a vertical wall cos(0) = 1 and the two
-                           constructions are identical -- which is exactly how the
-                           defect stayed hidden until it met a dome.
-  the 6 mm floor      #5   against a 2 mm wall. Letting the floor default to the
-                           wall inset was the second defect in the same function.
-  the drain slot      #4   an APERTURE: the specification is the opening, not the
-                           material beside it. Measured by casting a raster through
-                           it, which returns None when it was never cut.
-  the sealed void     #10  a shell with negative signed volume. A correct vessel
-                           reports one, and the gate used to call that "inside out"
-                           while passing the same part once its cavity had been
-                           flipped solid.
+  the 45-degree rim   a naive in-plane inset leaves 1.414 mm of a 2.000 mm wall
+                      here. On a vertical wall cos(0) = 1 and the two constructions
+                      are identical -- exactly how the defect stayed hidden until it
+                      met a dome.
+  the 6 mm floor      against a 2 mm wall. Letting the floor default to the wall
+                      inset was a second, independent defect in the same function.
+  the drain slot      an APERTURE: the specification is the opening, not the material
+                      beside it. Measured by casting a raster through it, which
+                      returns None when it was never cut.
+  the sealed void     a shell with negative signed volume. A correct vessel reports
+                      one, and the gate used to call that "inside out" while passing
+                      the same part once its cavity had been flipped solid.
 
 The void must be SEALED and separate from the bowl. An aperture that reaches a
 cavity merges it into the outer shell -- one body, no negative volume -- so a vessel
-with only an open bowl cannot exercise #10 at all. Hence two hollow features.
+with only an open bowl cannot exercise the cavity count at all. Hence two hollow
+features.
 
 Coordinate system
 -----------------

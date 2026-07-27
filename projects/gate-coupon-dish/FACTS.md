@@ -6,7 +6,7 @@
 > the confidence legend exists to say how well each number is known. This part has no
 > real-world counterpart. Nobody measured a shelf it must fit, a bar it must clear, or a
 > coin it must pass. **Every number below is a coverage choice**, selected so that a
-> specific defect in `.claude/HARNESS-LEDGER.md` fails loudly if it returns.
+> specific defect this harness has actually shipped fails loudly if it returns.
 >
 > The tags therefore mean something narrower here than the legend implies. `[STATED]`
 > means "chosen deliberately, and here is what it protects". There is no `[MEASURED]`
@@ -29,7 +29,7 @@ Be the hollow half of this repository's regression net.
 can. A flipped cavity leaves `bodies`, `open_edges`, `over_edges`, `winding_flips` and
 `genus` **all identical**; only the signed volume and the cavity count move. The saddle
 fixture -- and therefore the entire pinned-digest regression net -- was blind to every
-hollow-geometry defect in the ledger.
+hollow-geometry defect this harness has shipped.
 
 This part is what makes those defects visible to a gate.
 
@@ -50,8 +50,9 @@ None. It sits on a desk. `[STATED]`
 | one piece, no supports | yes | `[STATED]` | the 45 deg rim sits exactly at the unsupported limit |
 
 The envelope constrains **the shell**, not an assembly. This part has no assembly, so
-there is no section-9 mechanism row for it to contradict -- ledger #7 is the case where
-those two did collide, and it is worth knowing this file cannot reproduce it.
+there is no section-9 mechanism row for it to contradict. That collision -- an envelope row
+saying "one piece" against a scope row choosing a two-piece mechanism -- is real and worth
+knowing about, but this file cannot reproduce it.
 
 ## 4. Existing hardware -- reference only
 
@@ -65,10 +66,10 @@ check** rather than a plausible part.
 
 | Fact | Value | Confidence | The defect it catches |
 |---|---|---|---|
-| rim slope | 1.000, i.e. 45 deg | `[STATED]` | **#5.** A naive in-plane inset leaves `wall * cos(alpha)`. At 45 deg that is 1.4142 mm of a 2.000 mm wall, a 29% error. On a vertical wall `cos(0) = 1` and the correct and incorrect constructions are **identical** -- which is precisely how the defect survived until it met a dome. |
-| wall thickness | 2.00 mm | `[STATED]` | **#5.** Measured perpendicular to the surface at 24 stations, along the true meridional normal. A radial cast reads a longer chord and under-reports the defect it is meant to find. |
-| floor thickness | 6.00 mm | `[STATED]` | **#5, second defect.** Deliberately **not** the wall. Letting the floor default to the wall inset was an independent bug in the same function; 6.00 against 2.00 makes a regression a 4 mm error rather than a rounding one. |
-| sealed void | 6 x 6 x 2 = 72.0 mm^3 | `[STATED]` | **#8 and #10.** A shell with negative signed volume. Flipping it outward moves the total by exactly +144.0 mm^3, to 24068.4142, which `inspect_model.py` detects with zero shared code. |
+| rim slope | 1.000, i.e. 45 deg | `[STATED]` | **The in-plane inset defect.** A naive in-plane inset leaves `wall * cos(alpha)`. At 45 deg that is 1.4142 mm of a 2.000 mm wall, a 29% error. On a vertical wall `cos(0) = 1` and the correct and incorrect constructions are **identical** -- which is precisely how the defect survived until it met a dome. |
+| wall thickness | 2.00 mm | `[STATED]` | **Same defect, measured.** Measured perpendicular to the surface at 24 stations, along the true meridional normal. A radial cast reads a longer chord and under-reports the defect it is meant to find. |
+| floor thickness | 6.00 mm | `[STATED]` | **The floor-defaults-to-wall defect.** Deliberately **not** the wall. Letting the floor default to the wall inset was an independent bug in the same function; 6.00 against 2.00 makes a regression a 4 mm error rather than a rounding one. |
+| sealed void | 6 x 6 x 2 = 72.0 mm^3 | `[STATED]` | **The flipped-cavity and rejected-vessel defects.** A shell with negative signed volume. Flipping it outward moves the total by exactly +144.0 mm^3, to 24068.4142, which `inspect_model.py` detects with zero shared code. |
 
 Material volume, `[DERIVED from 5]`: **23924.4142 mm^3**, pinned in `smoke.sh`.
 
@@ -80,7 +81,7 @@ Not an aesthetic choice, and easy to get wrong.
 bowl to the air and its interior surface becomes part of the outer shell: one body, no
 negative volume, `inverted_bodies = 0`. A vessel with only an open bowl cannot exercise
 `expect_cavities` at all -- the check would pass while measuring nothing, which is the
-failure class the whole ledger is about.
+failure class this whole harness exists to prevent.
 
 So the part carries both:
 
@@ -104,9 +105,9 @@ A gate that cannot fail is not a gate. Each defect was reintroduced and rebuilt:
 
 | Reintroduced | Result | Failing checks |
 |---|---|---|
-| `clean_mesh(recalc_normals=True)` (#8) | refused, no STL | `solids`, `cavities` |
-| naive in-plane inset (#5) | refused, no STL | `rim_wall_perpendicular` read **1.4142** |
-| slot never cut (#4) | refused, no STL | `genus`, `aperture_was_cut`, `drain_aperture_w` |
+| `clean_mesh(recalc_normals=True)` | refused, no STL | `solids`, `cavities` |
+| naive in-plane inset | refused, no STL | `rim_wall_perpendicular` read **1.4142** |
+| slot never cut | refused, no STL | `genus`, `aperture_was_cut`, `drain_aperture_w` |
 | unmodified | exported | none |
 
 The flipped-cavity build was then exported deliberately, bypassing the gate, to confirm

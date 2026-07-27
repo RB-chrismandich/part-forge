@@ -61,8 +61,9 @@ ever produced a wrong artifact. `kit_smoke.sh` is that half, and it is slow and 
   must never be deduplicated: it is a third independent opinion on the exported bytes, and
   collapsing it into `mesh_audit` destroys the evidence, exactly as the paragraph above says.
   The remaining construction forks (`prism`, `loft_solid`, `clean_mesh`, `circumscribed_circle`,
-  `rounded_rect`, `corner_fillet`) are deliberately divergent, not drifted; `.claude/HARNESS-LEDGER.md`
-  #11 records which and why.
+  `rounded_rect`, `corner_fillet`) are deliberately divergent, not drifted. `circumscribed_circle`
+  is rotated 90 degrees so a flat facet lands at the trough's rest point rather than a
+  tessellation valley; swapping any of them moves the pinned digest for no gain.
 - **Tier 0 of `mesh_audit.py` must stay standard-library-only** so the gate can run inside
   Blender's bundled Python without acquiring an install step.
 

@@ -39,9 +39,10 @@ SKIP=0
 readonly EXPECT_DIGEST="a916d985268c8921fff6f15315bc8e74"
 readonly EXPECT_VOLUME="32953.0289"
 
-# The vessel fixture. A SOLID part cannot exercise a cavity, so the saddle above
-# is blind to every hollow-geometry defect in .claude/HARNESS-LEDGER.md. These
-# numbers are the ones that move if any of them comes back.
+# The vessel fixture. A SOLID part cannot exercise a cavity, so the saddle above is
+# blind to every hollow-geometry failure: a flipped cavity leaves bodies, open edges,
+# winding flips and genus all identical, and moves only the signed volume and the
+# cavity count. These are the numbers that move if one comes back.
 readonly VESSEL_DIGEST="964be23728bc126c0f7c06eafca0ce6f"
 readonly VESSEL_VOLUME="23924.4142"
 readonly VESSEL_CAVITY_MM3="72.0"       # 6 x 6 x 2 sealed void, negative shell
