@@ -49,6 +49,14 @@ ever produced a wrong artifact. `kit_smoke.sh` is that half, and it is slow and 
 - **Script paths in a runnable fence must go through `${CLAUDE_PLUGIN_ROOT}`.** An installed
   plugin is never the working directory.
 - **`plugin.json`'s version silently beats `marketplace.json`'s.** Bump both.
+- **Editing a plugin's files is what obliges a bump, not deciding to release.** An install
+  resolves on the version string alone, so content shipped under an unchanged version is
+  content no installer can ever receive — and `plugin update` answers "already at the
+  latest version" forever. Both plugins have already shipped this way. `version-agreement`
+  cannot see it, because both manifests agree while the files move underneath them;
+  `version-freshness` is the check that reads the directory instead, and it errors on
+  anything changed since the commit that set the declared version. If you touched
+  `plugins/`, the change is unfinished until the version moves too.
 - **There is no test suite.** `smoke.sh`, `kit_smoke.sh` and the fixture STLs are the entire
   regression net. The pinned digest hashes the **welded, rounded, sorted unique vertex set
   `mesh_audit` parses out of the committed file** — deliberately *not* the bytes. That is why

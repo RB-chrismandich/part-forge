@@ -131,6 +131,23 @@ claude plugin validate ./plugins/<name>   # what the runtime will actually accep
 The first two disagree occasionally. When they do, the runtime is right and `repo_check.py`
 needs a new check.
 
+## Before you stop: did the version move?
+
+If you changed anything under `plugins/<name>/`, the change is not finished until the
+version moves with it. Editing content is what obliges the bump — not deciding to
+publish. There is no separate release moment when someone notices; a plugin installed
+from this marketplace resolves on the version string alone, so content that ships under
+an unchanged version is content the installer can never receive, and `plugin update`
+will keep answering "already at the latest version" indefinitely.
+
+`repo_check.py`'s `version-freshness` check is what enforces this. It finds the commit
+that introduced the currently declared version and errors on anything under the plugin
+that has moved since — committed or not. If it fires, invoke `release-plugins` and bump;
+do not silence it.
+
+The trap this closes is specific: `version-agreement` compares one manifest to the other,
+and both can agree perfectly while describing files that changed underneath them.
+
 ## Things that make a plugin worse
 
 - **A description that summarises the procedure.** The agent follows the summary and never

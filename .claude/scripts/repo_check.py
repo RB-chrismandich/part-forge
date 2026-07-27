@@ -730,6 +730,106 @@ def check_gitignore_twin(root: Path, rep: Report) -> None:
             )
 
 
+def bump_required_for(rel_path: str) -> bool:
+    """Does a change to this path oblige a version bump?
+
+    Strict, deliberately: if a byte an installer receives changed, the version
+    they resolve changes too. The path is relative to the plugin directory.
+
+    The tempting exemption is documentation, and it is wrong here. An installed
+    plugin ships its README and its reference files, and this repository's
+    plugins are *mostly* prose -- a skill body is the product, not a comment on
+    it. print-tune-bambu's stale ship was a restructured SKILL.md and two new
+    reference files: every path an exemption list would plausibly have skipped.
+
+    The cost is a bump for a typo fix. That is the cheap failure. The expensive
+    one is an installer stuck on a version that silently reports itself current.
+    """
+    return True
+
+
+def check_version_freshness(root: Path, rep: Report) -> None:
+    """A plugin's files must not have moved since its version last moved.
+
+    `version-agreement` compares one manifest against the other. Both can agree
+    perfectly and still be wrong, because the thing they describe -- the files
+    an installer receives -- is not consulted by either. That is not
+    hypothetical: print-tune-bambu shipped a restructured SKILL.md and two new
+    reference files under an unchanged 0.1.0, and `plugin update` reported
+    "already at the latest version" because the only evidence it has is the
+    string in the manifest.
+
+    So this check asks the question the manifests cannot: find the commit that
+    introduced the version currently declared, then look at what has changed
+    under the plugin since. Anything there is content an installer has no way
+    to resolve.
+    """
+    import subprocess
+
+    def git(*args: str) -> str | None:
+        try:
+            proc = subprocess.run(
+                ["git", *args], cwd=root, capture_output=True, text=True, timeout=30
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            return None
+        return proc.stdout if proc.returncode == 0 else None
+
+    if git("rev-parse", "--git-dir") is None:
+        return  # not a checkout, or no git -- nothing to compare against
+
+    for pdir in sorted((root / "plugins").glob("*")):
+        manifest = pdir / ".claude-plugin" / "plugin.json"
+        if not manifest.is_file():
+            continue
+        data = load_json(manifest, rep, "version-freshness")
+        if data is None:
+            continue
+        version = data.get("version")
+        if not version:
+            continue
+
+        rep.checks_run += 1
+        rel_manifest = manifest.relative_to(root).as_posix()
+        rel_dir = pdir.relative_to(root).as_posix()
+
+        # The commit that introduced this exact version string. Pickaxe rather
+        # than blame: blame reports whoever last touched the line, which a
+        # reformat moves without changing what it says.
+        out = git(
+            "log", "-1", "--format=%H", "-S", f'"version": "{version}"', "--", rel_manifest
+        )
+        sha = (out or "").strip()
+        if not sha:
+            # Declared but never committed -- the bump is the pending change.
+            continue
+
+        changed = set()
+        for line in (git("diff", "--name-only", f"{sha}..HEAD", "--", rel_dir) or "").split():
+            changed.add(line)
+        # Uncommitted work counts: the gate runs before a commit, not after.
+        for line in (git("status", "--porcelain", "--", rel_dir) or "").splitlines():
+            if len(line) > 3:
+                changed.add(line[3:].strip().split(" -> ")[-1])
+
+        stale = sorted(
+            p for p in changed if bump_required_for(p[len(rel_dir) :].lstrip("/"))
+        )
+        # The bump commit itself edits the manifest; sha..HEAD already excludes it.
+        stale = [p for p in stale if p != rel_manifest]
+        if not stale:
+            continue
+
+        shown = ", ".join(stale[:4]) + (f" (+{len(stale) - 4} more)" if len(stale) > 4 else "")
+        rep.error(
+            "version-freshness",
+            str(manifest),
+            f"{len(stale)} file(s) changed since {version!r} was set in {sha[:7]}, "
+            f"so an installer on {version} receives none of it and `plugin update` "
+            f"reports it current: {shown}",
+        )
+
+
 def check_fixture(root: Path, rep: Report) -> None:
     """The dogfood projects are the only fixtures the scripts have.
 
@@ -789,6 +889,7 @@ def run(root: Path, skip_cli: bool = False) -> Report:
     check_python_compiles(root, rep)
     check_hooks(root, rep)
     check_gitignore_twin(root, rep)
+    check_version_freshness(root, rep)
     check_fixture(root, rep)
     if not skip_cli:
         check_claude_cli(root, rep)
