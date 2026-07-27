@@ -1,0 +1,54 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "part-forge",
+  "description": "Designing, verifying, and printing functional parts: a measured-facts ledger that governs the model, parametric generators, an acceptance gate that reads the exported bytes back off disk, and slicer tuning grounded in real stock values.",
+  "owner": {
+    "name": "chrismandich",
+    "email": "mandichc@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "part-forge",
+      "description": "Design functional 3D-printable parts as parametric generators with measured inputs and a gated verification harness. Turns a physical problem into a facts ledger, a Blender generator script, an acceptance gate that refuses to export a bad solid, and a headless audit of the exported bytes.",
+      "author": {
+        "name": "chrismandich",
+        "email": "mandichc@gmail.com"
+      },
+      "category": "development",
+      "source": "./plugins/part-forge",
+      "version": "0.1.0",
+      "homepage": "https://github.com/RB-chrismandich/part-forge",
+      "keywords": [
+        "3d-printing",
+        "blender",
+        "parametric",
+        "cad",
+        "fdm",
+        "mesh-verification",
+        "trimesh",
+        "engineering"
+      ]
+    },
+    {
+      "name": "print-tune-bambu",
+      "description": "Recommend Bambu Studio print settings grounded in the local install's real stock values, a mirror of the official wiki, and a headless slice. Emits an importable process preset and a brief where every change is traced to a named failure mode.",
+      "author": {
+        "name": "chrismandich",
+        "email": "mandichc@gmail.com"
+      },
+      "category": "development",
+      "source": "./plugins/print-tune-bambu",
+      "version": "0.1.0",
+      "homepage": "https://github.com/RB-chrismandich/part-forge",
+      "keywords": [
+        "3d-printing",
+        "bambu-studio",
+        "slicer",
+        "fdm",
+        "print-settings",
+        "petg",
+        "pla"
+      ]
+    }
+  ]
+}

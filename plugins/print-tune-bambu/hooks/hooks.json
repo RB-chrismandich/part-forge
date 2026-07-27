@@ -1,0 +1,18 @@
+{
+  "description": "Refresh the local Bambu wiki mirror when, and only when, the skill that reads it is invoked. Throttled to once per day by a timestamp file, spawns any real sync detached, and can never fail the tool call.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 20,
+            "statusMessage": "Checking Bambu wiki mirror",
+            "command": "jq -e -r 'select(.tool_input.skill | test(\"print-tune-bambu\"))' >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts/wiki_sync.py\" autorefresh 2>/dev/null || true"
+          }
+        ]
+      }
+    ]
+  }
+}

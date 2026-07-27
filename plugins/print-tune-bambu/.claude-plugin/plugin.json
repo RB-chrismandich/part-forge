@@ -1,0 +1,20 @@
+{
+  "name": "print-tune-bambu",
+  "version": "0.1.0",
+  "description": "Recommend Bambu Studio print settings grounded in the local install's real stock values, a mirror of the official wiki, and a headless slice. Emits an importable process preset and a brief where every change is traced to a named failure mode.",
+  "author": {
+    "name": "chrismandich",
+    "email": "mandichc@gmail.com"
+  },
+  "repository": "https://github.com/RB-chrismandich/part-forge",
+  "license": "MIT",
+  "keywords": [
+    "3d-printing",
+    "bambu-studio",
+    "slicer",
+    "fdm",
+    "print-settings",
+    "petg",
+    "pla"
+  ]
+}
