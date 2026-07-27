@@ -48,6 +48,14 @@ plugins/<name>/.claude-plugin/plugin.json      # "version"
 `repo_check.py` reports disagreement as an error. That is the only thing standing between
 a bump and a version nobody receives.
 
+Two manifests agreeing is necessary and not sufficient. They can agree exactly while the
+files they describe have moved underneath them, which is how print-tune-bambu shipped a
+restructured skill and two new reference files under an unchanged `0.1.0`. The
+`version-freshness` check is the one that reads the plugin directory rather than the
+manifests: it finds the commit that introduced the declared version and errors on
+anything changed since. Run it *before* choosing the bump size — what it lists is the
+change set you are versioning, and it is routinely larger than what you remember editing.
+
 While you are there, confirm the two `description` fields still match. They are separately
 authored copies of one sentence and drift is a warning, not an error, because the
 marketplace entry is allowed to read differently — but usually it should not.
