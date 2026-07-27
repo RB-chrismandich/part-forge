@@ -135,16 +135,24 @@ local rendering changed and `updatedAt` cannot express that.
 ## Keeping it fresh
 
 **Primary mechanism: a hook tied to actual use.** A `PreToolUse` hook on the
-`Skill` tool in this project's `.claude/settings.json` runs `autorefresh`
-whenever print-tune-bambu is invoked. The skill is project-owned, so the hook
-lives with the project and uses a repo-relative script path:
+`Skill` tool runs `autorefresh` whenever print-tune-bambu is invoked. It ships
+with the plugin at `hooks/hooks.json` and registers automatically when the plugin
+is enabled — nothing to add to `.claude/settings.json` by hand:
 
 ```json
 { "matcher": "Skill",
   "hooks": [{ "type": "command", "timeout": 20,
               "statusMessage": "Checking Bambu wiki mirror",
-              "command": "jq -e -r \"select(.tool_input.skill == \\\"print-tune-bambu\\\")\" >/dev/null 2>&1 && python3 \"$CLAUDE_PROJECT_DIR/.claude/skills/print-tune-bambu/scripts/wiki_sync.py\" autorefresh 2>/dev/null || true" }] }
+              "command": "jq -e -r 'select(.tool_input.skill | test(\"print-tune-bambu\"))' >/dev/null 2>&1 && python3 \"${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts/wiki_sync.py\" autorefresh 2>/dev/null || true" }] }
 ```
+
+Two details differ from the project-owned form this used to take. The path is
+`${CLAUDE_PLUGIN_ROOT}`, not `$CLAUDE_PROJECT_DIR`, because a plugin resolves
+against wherever it was installed rather than against a repository. And the skill
+match is `test(...)` rather than `==`, because a plugin skill arrives namespaced —
+`print-tune-bambu:print-tune-bambu` — while the same skill loaded from a project
+directory arrives bare. The substring test covers both, so the hook keeps working
+whichever way the skill is being loaded.
 
 This is better than a timer because it refreshes exactly when freshness could
 matter and never when it cannot. Three properties make it safe to sit in front of

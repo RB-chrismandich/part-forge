@@ -44,7 +44,7 @@ from the local install. Use it instead of recalling defaults; presets change
 between Studio releases and between printers.
 
 ```bash
-S=.claude/skills/print-tune-bambu/scripts   # repo-relative; run from the repo root
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"   # set once, reused below
 
 python3 $S/bambu_profiles.py root                      # confirm install + user preset dir
 python3 $S/bambu_profiles.py list --printer 'H2D(?!P)' --nozzle 0.4
@@ -320,3 +320,34 @@ that `root` printed).
   weekly refresh agent, and how to point a RAG index at it.
 - `references/slice-verification.md` — what the headless slicer reports, how to
   read a comparison, and the multi-extruder limitation in detail.
+
+## When the model came from a generator
+
+If the part was produced by a `part-forge` generator, a `verify_report.json` sits
+beside the STL and it has already measured most of what Step 2 asks for — wall
+thickness at the worst station, overhang area, volume, bounding box, and the load
+path's safety factor — against expected values, on the exported bytes. Read it
+before running `inspect_model.py`, and quote its numbers. It knows which station
+is the thin one; a fresh measurement does not.
+
+Two things it does *not* remove the need for. It says nothing about slicing: time,
+mass, and the slicer's own warnings still require a real slice. And its overhang
+figure is computed for the build axis the generator baked in, so if the part is
+being placed differently on the bed, that number does not transfer.
+
+`inspect_model.py` and part-forge's `mesh_audit.py` overlap deliberately. They are
+independent implementations reading the same file, and two tools agreeing from
+different evidence is a much stronger claim than either alone — the whole reason
+part-forge audits outside Blender is that a single implementation once passed 135
+checks on a file Bambu Studio refused to slice. When the two disagree, that
+disagreement is the finding. Do not average them; establish which one is measuring
+what the slicer will read.
+
+## Related
+
+- `parametric-part-workflow` — the design process upstream of this one. Stage 9
+  hands off here.
+- `fdm-structural-design` — orientation and wall thickness as structural decisions
+  rather than slicer settings, decided before the model reaches this skill.
+- `mesh-verification-gate` — why a mesh that passes every check can still be
+  refused by a slicer, and what to check instead.
