@@ -480,9 +480,20 @@ def acceptance(v, g):
     a.exact("winding_flips", t["winding_flips"], 0,
             "inconsistent winding leaves inside and outside ambiguous")
     a.exact("degenerate_faces", t["degenerate_faces"], 0)
-    a.exact("bodies", t["bodies"], 1, "stray shells print as debris")
+    # This bracket is a SOLID: one positive shell, no cavities. Both numbers below
+    # are declarations about that shape, not universal constants. A plate of N
+    # coupons declares N solids; a vessel declares 1 solid and K cavities, a cavity
+    # being a shell with negative signed volume. See `mesh-verification-gate`.
+    a.exact("solids", t["bodies"] - t["inverted_bodies"], 1,
+            "positive-volume shells; stray ones print as debris")
+    a.exact("cavities", t["inverted_bodies"], 0,
+            "this part is solid, so a negative-volume shell means it is inside out")
     a.exact("euler_even", t["euler"] % 2, 0,
             "a closed orientable surface has euler = 2 - 2g, always even")
+    # CAREFUL when adapting this line. Genus equals the hole count only for a solid
+    # with bores through it. A hollow shell with two openings is a pipe -- genus 1 --
+    # no matter how many holes it has, so a reader who copies `N_HOLES` into a vessel
+    # gets a check that is confidently wrong about the shape it is guarding.
     a.exact("genus", t["genus"], g["N_HOLES"],
             "each through hole adds one handle; a genus below the hole count "
             "means a bore did not punch through, and a boolean silently did nothing")

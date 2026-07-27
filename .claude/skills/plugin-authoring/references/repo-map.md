@@ -17,7 +17,8 @@ plugins/print-tune-bambu/           slicer settings
   .claude-plugin/plugin.json
   hooks/hooks.json                  PreToolUse on the Skill tool
   skills/print-tune-bambu/          one skill; its scripts are nested inside it
-projects/shade-bar-mount/           the worked example, and the only test fixture
+projects/shade-bar-mount/           the worked example: a solid, and a test fixture
+projects/gate-coupon-dish/          the hollow fixture: shelled vessel, sealed cavity
 .claude/                            this tooling -- project-scoped, not shipped
   scripts/repo_check.py             structural gate
   scripts/smoke.sh                  regression harness

@@ -1,0 +1,6 @@
+*.blend1
+__pycache__/
+*.pyc
+
+# Bambu Studio CLI drops this next to the working dir on every slice
+result.json

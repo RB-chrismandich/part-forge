@@ -61,7 +61,8 @@ export, then re-parse and run the file tier on what was actually written.
 ## The check inventory
 
 Full list with tolerances and rationale: `references/check-inventory.md`. The structural
-subset is unconditional — no printable solid is exempt:
+subset is unconditional — no printable solid is exempt. What a part may declare is its
+*shape*, not whether it is checked:
 
 | Check | Expected | Why it is not optional |
 |---|---|---|
@@ -69,11 +70,36 @@ subset is unconditional — no printable solid is exempt:
 | over-used edges | 0 | three or more faces on one edge; the fault that shipped |
 | winding flips | 0 | inside and outside are ambiguous |
 | degenerate faces | 0 | zero area or repeated vertex |
-| bodies | 1 | stray shells print as debris |
+| solids | the declared count, default 1 | positive-volume shells; too many is debris, too few is two parts fused |
+| cavities | the declared count, default 0 | negative-volume shells; undeclared, it means the solid is inside out |
 | Euler characteristic | even, and <= 2 per body | a closed orientable surface has `euler = 2 - 2g`; odd or above the bound means torn or non-orientable |
 | genus | reported; gate it when known | counts through-holes; gating it catches a bore that silently failed to punch |
-| signed volume | > 0 | negative means the solid is inside out |
+| total signed volume | > 0 | zero or negative means no material, or a cavity larger than its shell |
 | null-volume bodies | 0 | a shell enclosing nothing |
+
+### Three shapes, and the gate has to tell them apart
+
+`bodies` is not the right primitive, and gating it at 1 was wrong in both directions. A shell
+is **positive** if its signed volume is positive and **negative** — a cavity — if it is not,
+so `bodies = solids + cavities`. Three shapes are legitimate:
+
+| Shape | solids | cavities | example |
+|---|---|---|---|
+| solid | 1 | 0 | a bracket with bores |
+| plate | N | 0 | ten clearance coupons on one bed |
+| vessel | 1 | K | a bank, a housing, anything hollow |
+
+Declare the shape. `--expect-solids N` and `--expect-cavities K`, or the same arguments on
+`gated_export`. An exact count is strictly stronger than the old `--allow-multi-body`, which
+survives as an alias meaning "do not gate the count": permitting any number catches debris
+but not a plug fused to its socket, because fusing *lowers* the count.
+
+**This gate previously preferred a corrupted part to a sound one, and that is the reason the
+row above changed.** A correct vessel reports one negative shell, and the unconditional
+`inverted_bodies == 0` rejected it as "the solid is inside out". Run `clean_mesh` with its
+old unconditional `recalc_face_normals` and the cavity flips outward, the part becomes
+silently solid — seven times the intended mass — and `inverted_bodies` reads 0, so the same
+gate passes it. The one part that was built correctly was the one it refused.
 
 On top of those sit the part-specific checks: envelope and bounding box, the mating
 dimensions, minimum wall on the load path, clearance and drop-in fit, and the structural

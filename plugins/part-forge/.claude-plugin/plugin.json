@@ -1,6 +1,6 @@
 {
   "name": "part-forge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Design functional 3D-printable parts as parametric generators with measured inputs and a gated verification harness. Turns a physical problem into a facts ledger, a Blender generator script, an acceptance gate that refuses to export a bad solid, and a headless audit of the exported bytes.",
   "author": {
     "name": "chrismandich",

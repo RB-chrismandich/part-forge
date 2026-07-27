@@ -197,6 +197,28 @@ def vertex_digest(verts, places=4):
 #  TIER 0 - topology
 # ===========================================================================
 
+def require_triangles(faces, who):
+    """Raise a diagnosable error if `faces` is not all triangles.
+
+    This module is triangles-only throughout, because STL is a triangle format and
+    everything here was written against it. Nothing said so. The failure it produced
+    was `ValueError: too many values to unpack (expected 3)` from a tuple unpack
+    several frames deep, which names neither the requirement nor the offending face.
+
+    Worth keeping even after every in-repo caller triangulates first. The people who
+    reach this module with polygons are the ones writing a stage-by-stage diagnostic
+    -- that is, people already debugging something else, for whom an opaque unpack
+    error inside the trusted auditor is the most expensive possible answer.
+    """
+    for i, f in enumerate(faces):
+        if len(f) != 3:
+            raise ValueError(
+                f"{who}: needs triangles; face {i} has {len(f)} vertices. "
+                f"Run part_kit.triangulate_and_purge first, or "
+                f"bmesh.ops.triangulate(bm, faces=bm.faces) on a copy."
+            )
+
+
 def topology(verts, faces, metric_verts=None):
     """Manifold, winding, Euler, and connected-body analysis.
 
@@ -210,7 +232,10 @@ def topology(verts, faces, metric_verts=None):
       winding flip   a *directed* edge traversed twice; on a consistently wound
                      closed surface every directed edge occurs exactly once
       degenerate     a triangle with a repeated vertex id or zero area
+
+    `faces` must be triangles. See `require_triangles`.
     """
+    require_triangles(faces, "topology")
     mv = verts if metric_verts is None else metric_verts
     undirected = defaultdict(int)
     directed = defaultdict(int)
@@ -332,6 +357,7 @@ def bounds(tris):
 
 
 def edge_lengths(verts, faces):
+    require_triangles(faces, "edge_lengths")
     seen = set()
     lo, hi, total, n = math.inf, 0.0, 0.0, 0
     for a, b, c in faces:
@@ -560,13 +586,41 @@ STRUCTURAL_GATES = (
     ("over_edges", 0, "edge shared by 3+ faces -- self-intersecting or coincident shells"),
     ("winding_flips", 0, "inconsistent face winding -- inside and outside are ambiguous"),
     ("degenerate_faces", 0, "zero-area or repeated-vertex triangles"),
-    ("inverted_bodies", 0, "negative signed volume -- the solid is inside out"),
     ("null_volume_bodies", 0, "a body enclosing no volume"),
 )
+# `inverted_bodies` is deliberately NOT in this list. A negative-volume shell is a
+# cavity, which is a defect only when the caller did not ask for one -- see the body
+# model on `acceptance`.
 
 
-def acceptance(report, expect, allow_multi_body):
-    """Collect faults. Returns a list of {check, got, want, why} dicts."""
+def acceptance(report, expect, allow_multi_body=False, *,
+               expect_solids=None, expect_cavities=0):
+    """Collect faults. Returns a list of {check, got, want, why} dicts.
+
+    The body model, stated once because three separate gates read from it. A
+    printable artifact is some number of **solids** -- closed shells with positive
+    signed volume -- any of which may contain **cavities**, closed shells with
+    negative signed volume that subtract from the material. So:
+
+        bodies          = solids + cavities
+        inverted_bodies = cavities
+
+    Three shapes are legitimate and the gate must be able to tell them apart: a
+    solid (1, 0), a plate of N coupons (N, 0), and a vessel with K sealed cavities
+    (1, K).
+
+    `expect_solids=None` leaves the count ungated, which is exactly what
+    `allow_multi_body=True` has always meant and remains its translation. Declaring a
+    number is strictly stronger than permitting any number: it catches a plug fused
+    to its socket, which *lowers* the count, as readily as debris, which raises it.
+
+    `expect_cavities` defaults to 0, so an ordinary part gates precisely as before.
+    It exists because a correct vessel reports `inverted_bodies == 1`, and the old
+    unconditional `inverted_bodies == 0` rejected it as "the solid is inside out" --
+    while passing that same vessel once `clean_mesh` had flipped the cavity outward
+    and quietly made it solid. The gate preferred the corrupted artifact to the sound
+    one, which is the precise inversion this plugin exists to prevent.
+    """
     faults = []
     topo = report["topology"]
 
@@ -575,10 +629,41 @@ def acceptance(report, expect, allow_multi_body):
         if got != want:
             faults.append({"check": key, "got": got, "want": want, "why": why})
 
-    if not allow_multi_body and topo["bodies"] != 1:
+    n_bodies = topo["bodies"]
+    n_cavities = topo["inverted_bodies"]
+    n_solids = n_bodies - n_cavities
+
+    if n_cavities != expect_cavities:
         faults.append({
-            "check": "bodies", "got": topo["bodies"], "want": 1,
-            "why": "stray shells print as debris; pass --allow-multi-body if intended",
+            "check": "inverted_bodies", "got": n_cavities, "want": expect_cavities,
+            "why": "a shell with negative signed volume is a cavity. With "
+                   "expect_cavities=0 this means the solid is inside out; declare "
+                   "--expect-cavities K for a vessel that should have K of them",
+        })
+
+    if expect_solids is not None:
+        if n_solids != expect_solids:
+            faults.append({
+                "check": "solids", "got": n_solids, "want": expect_solids,
+                "why": "positive-volume shells, cavities excluded. Too many means "
+                       "debris or a part that failed to fuse; too few means two "
+                       "parts fused into one",
+            })
+    elif not allow_multi_body and n_solids != 1:
+        faults.append({
+            "check": "bodies", "got": n_bodies, "want": 1,
+            "why": "stray shells print as debris; pass --allow-multi-body, or "
+                   "--expect-solids N for a plate of N coupons",
+        })
+
+    # Total signed volume was implied by the old unconditional inverted_bodies gate
+    # and has to be asserted directly now that cavities are legal: a cavity larger
+    # than the shell containing it is arithmetic, not geometry.
+    if topo["volume"] <= 0.0:
+        faults.append({
+            "check": "volume_sign", "got": round(topo["volume"], 6), "want": "> 0",
+            "why": "total signed volume is zero or negative -- the part encloses no "
+                   "material, or a cavity exceeds the solid around it",
         })
 
     # Euler is NOT gated at 2. A through-hole adds a handle, so a plate with two
@@ -773,6 +858,14 @@ def main(argv=None):
                     help="inline expectation, repeatable: --expect topology.volume=32953~1.0")
     ap.add_argument("--gate", action="store_true", help="exit 1 if any fault or failed expectation")
     ap.add_argument("--allow-multi-body", action="store_true", help="do not fault on more than one shell")
+    ap.add_argument("--expect-solids", type=int, default=None, metavar="N",
+                    help="assert exactly N positive-volume shells, cavities "
+                         "excluded. Stronger than --allow-multi-body: it also "
+                         "catches two parts fused into one, which lowers the count")
+    ap.add_argument("--expect-cavities", type=int, default=0, metavar="K",
+                    help="number of sealed internal cavities the part should have "
+                         "(default 0). A cavity is a shell with negative signed "
+                         "volume; a vessel has one and is not inside out")
     ap.add_argument("--genus", type=int, default=None, metavar="N",
                     help="assert the number of through-holes (handles). Genus is "
                          "reported either way; gating it catches a boolean that "
@@ -812,7 +905,9 @@ def main(argv=None):
     if args.genus is not None:
         expect["topology.genus"] = {"value": args.genus, "tol": 0}
 
-    faults = acceptance(report, expect, args.allow_multi_body)
+    faults = acceptance(report, expect, args.allow_multi_body,
+                        expect_solids=args.expect_solids,
+                        expect_cavities=args.expect_cavities)
     report["expect"] = expect
     report["faults"] = faults
     report["accepted"] = not faults
