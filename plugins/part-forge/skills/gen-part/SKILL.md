@@ -1,7 +1,7 @@
 ---
 name: gen-part
 description: Run a parametric part generator in Blender, report every acceptance check, and export only the variants that pass. Reports measured-versus-expected numbers rather than a pass count, and independently re-audits the exported files outside Blender.
-argument-hint: [path/to/part_gen.py] [--out DIR] [--no-export]
+argument-hint: "[path/to/part_gen.py] [--out DIR] [--no-export]"
 allowed-tools: Bash, Read, Glob, Grep, Skill
 ---
 
