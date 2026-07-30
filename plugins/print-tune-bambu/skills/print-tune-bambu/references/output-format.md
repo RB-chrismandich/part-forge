@@ -32,7 +32,7 @@ the profile honest and short>
 
 ## The preset JSON
 
-Match Bambu Studio's own export format exactly — a delta with `inherits`, not a
+Match Bambu Studio's own export format exactly -- a delta with `inherits`, not a
 full config:
 
 ```json
@@ -50,7 +50,7 @@ full config:
 
 **The H2D per-variant array is the thing that goes wrong.** On dual-nozzle
 machines, every speed and acceleration key is an array with one slot per extruder
-variant — five slots on the H2D, in the order given by `print_extruder_variant`:
+variant -- five slots on the H2D, in the order given by `print_extruder_variant`:
 
 | Slot | Extruder | Variant |
 |---|---|---|
@@ -76,7 +76,7 @@ this install, that every key appears in the base chain, and that per-variant
 arrays are the right length. Fix errors before presenting; surface warnings in
 the brief if they are intentional.
 
-To install it (only when the user asks — it writes into their Studio data dir,
+To install it (only when the user asks -- it writes into their Studio data dir,
 and Bambu Studio must be restarted to see it):
 
 ```bash

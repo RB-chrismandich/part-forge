@@ -44,8 +44,8 @@ family constrains), `h2d.md` (dual-nozzle envelope and the per-variant array con
 | Script | Purpose |
 |---|---|
 | `bambu_profiles.py` | Resolves Studio's preset inheritance from the local install. `root`, `list`, `get`, `trace`, `resolve`, `keys`, `user-list`, `validate`, `install`. |
-| `inspect_model.py` | Measures an STL/3MF/OBJ: bounding box, volume, bed contact, downward-face area by slope band, bridge spans, tipping ratio, watertightness. |
-| `slice_check.py` | Drives Studio's headless CLI and reads back what the slicer *did*. `check` for one preset, `compare` for a base-versus-candidate delta. |
+| `inspect_model.py` | Measures an STL/3MF/OBJ: bounding box, volume, bed contact, downward-face area by slope band, bridge spans, tipping ratio, watertightness, and narrow features — groove and rib widths measured in the slicing plane and judged against a line width, which is what decides whether engraved detail is printable at all. |
+| `slice_check.py` | Drives Studio's headless CLI and reads back what the slicer *did*. `check` for one preset, `compare` for a base-versus-candidate delta, `features` for the gcode's own `; FEATURE:` markers — extrusion, share and z range per feature, which is Studio's "Line type" preview as numbers. |
 | `wiki_sync.py` | Maintains the local wiki mirror. `status`, `sync`, `search`, `grep`, `show`, `hms`, `autorefresh`, `agent`. |
 
 ### Hook

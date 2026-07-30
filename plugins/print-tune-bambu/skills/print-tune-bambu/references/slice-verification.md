@@ -23,14 +23,14 @@ cost. Bambu Studio ships a headless CLI that closes that loop.
 
 Four distinct kinds of evidence, each worth something different:
 
-- **`applied`** — proof the preset took effect. A preset can import cleanly and
+- **`applied`** -- proof the preset took effect. A preset can import cleanly and
   still not apply the way it reads (see the H2D per-variant arrays in `h2d.md`).
   This is the only cheap way to catch that.
-- **time by feature** — where the minutes actually go. This is what makes a
+- **time by feature** -- where the minutes actually go. This is what makes a
   trade legible: if 34% of the print is sparse infill, cutting density is the
   lever; if outer wall dominates, it is not.
-- **mass** — the denominator for any strength-per-gram argument.
-- **slicer warning** — Bambu's own read of the geometry. On the shade-bar saddle
+- **mass** -- the denominator for any strength-per-gram argument.
+- **slicer warning** -- Bambu's own read of the geometry. On the shade-bar saddle
   it independently flagged the floating cantilever that `inspect_model.py`
   measured as 57 mm² of unsupported downward faces. Two tools agreeing from
   different evidence is much stronger than either alone.
@@ -55,6 +55,57 @@ about that from first principles is guesswork; measuring it takes 90 seconds.
 Quote the delta in the brief's "trading away" line. It is the difference between
 "this will take somewhat longer" and "this costs you 13 minutes and 16 grams."
 
+## What the slicer decided the geometry was
+
+`check` and `compare` answer "what does this cost". `features` answers "what did
+the slicer think it was looking at", by reading the gcode's own markers rather
+than `result.json`:
+
+```bash
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/slice_check.py" features ~/.cache/bambu-slice/check
+```
+
+```
+  feature                      extruded   share  blocks   z range
+  Sparse infill                2280.3 mm   45.9%     432   0.80–75.20 mm
+  Outer wall                   1248.7 mm   25.1%     388   0.20–76.20 mm
+  Inner wall                    985.4 mm   19.8%     381   0.20–76.00 mm
+  Floating vertical shell       152.6 mm    3.1%     127   17.00–75.40 mm *
+  Gap infill                     54.8 mm    1.1%      51   15.40–76.20 mm *
+  Bridge                         27.5 mm    0.6%       6   0.40–75.40 mm *
+  Overhang wall                   2.4 mm    0.0%      10   0.40–17.00 mm *
+```
+
+This is Bambu Studio's "Line type" preview expressed as numbers, and it is the
+measurement behind the "Engraved detail prints ragged" entry in
+`failure-modes.md`. **`Gap infill` is the signature of geometry too narrow for
+two walls.** Its z range is the useful part: it localises which detail on the
+part is failing, which no photograph and no bounding box can do.
+
+### Why this is not a restatement of `feature_type_times`
+
+They are different sets, and the difference matters:
+
+- `feature_type_times` invents **`Travel`** and **`Undefined`** buckets that no
+  gcode marker produces. They are time accounting, not extrusion.
+- It **omits `Floating vertical shell` entirely** -- 152.6 mm of real extrusion on
+  the fixture saddle, 3.1 % of the print, absent from the time breakdown.
+- It ranks by time, and the diagnostic features are cheap. `Gap infill` is 6.6
+  seconds on this part. It will never place in a top-six-by-time list, which is
+  precisely why `check` now prints it regardless of rank.
+
+Where the two sets overlap, the feature name strings are byte-identical, so they
+can be cross-referenced safely -- but neither is a subset of the other, and a
+reading that assumes it is will silently lose a feature class.
+
+The marker spelling was taken from real output of Studio 02.07.01.57, which emits
+`; FEATURE: <name>` and `; CHANGE_LAYER` / `; Z_HEIGHT:`. It does **not** emit the
+`;TYPE:` form other slicers use; matching on that finds nothing and reports an
+empty part. The gcode also carries a fully resolved config dump between
+`; CONFIG_BLOCK_START` and `; CONFIG_BLOCK_END`, which is the last word on what
+was actually applied when a preset's provenance is in doubt.
+
 ## The multi-extruder limitation
 
 The CLI **cannot slice for the H2D**, or any multi-extruder machine, from a bare
@@ -71,7 +122,7 @@ This was chased down rather than assumed. What does not fix it:
 - `--load-filament-ids`, `--load-defaultfila`, `--estimate-mode`
 - exporting a 3MF via the CLI and re-slicing it
 - patching `filament_map_mode` from `"Auto For Flush"` to `"Manual"` inside that
-  3MF's `project_settings.config` — it then fails under manual mode instead
+  3MF's `project_settings.config` -- it then fails under manual mode instead
 
 There is no `--filament-map` or `--filament-colour` option. The mapping is
 printer/AMS state the CLI has no way to accept. Single-extruder machines (X1C,
@@ -98,12 +149,12 @@ Two usable options on an H2D:
 - **Reported filament mass is `0.00 g`.** The CLI never resolves filament density
   in this mode, and the gcode footer says `total filament weight [g] : 0.00` too.
   `slice_check.py` recovers it from `total filament length [mm]` and the
-  filament preset's `filament_density`, resolved up the inheritance chain — the
+  filament preset's `filament_density`, resolved up the inheritance chain -- the
   leaf preset does not contain it. On the test part this yields 16.3 g against a
   measured 31 cm³ volume at 15% infill, which is the right order.
 - **The CLI does not follow `inherits`.** This is the one that silently corrupts
   results. Bambu's presets are deltas: `0.12mm Fine @BBL X1C.json` contains no
-  `layer_height` at all — it lives in the ancestor `fdm_process_single_0.12`.
+  `layer_height` at all -- it lives in the ancestor `fdm_process_single_0.12`.
   Hand the CLI that leaf file and it slices at the default 0.2 mm, exits 0, and
   writes valid gcode for a print nobody asked for. `slice_check.py` therefore
   resolves the chain into a flattened temp preset before every run.
@@ -114,5 +165,5 @@ Two usable options on an H2D:
 - **Give each run its own `--outdir`.** A failed run leaves the previous run's
   `plate_1.gcode` behind, and the next summary would pair a fresh `result.json`
   with stale gcode. `slice_check.py` clears the directory before each slice.
-- **`total filament volume [cm^3]` in the gcode is mislabeled** — the figure is
+- **`total filament volume [cm^3]` in the gcode is mislabeled** -- the figure is
   mm³. Do not quote it as cm³.

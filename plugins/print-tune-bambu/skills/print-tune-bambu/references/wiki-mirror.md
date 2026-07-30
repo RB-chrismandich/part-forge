@@ -14,13 +14,13 @@ exactly where the line falls is what makes the sync cheap:
 |---|---|---|
 | `pages.list(locale)` | **works** | The manifest: `id`, `path`, `title`, `description`, `updatedAt`, `contentType` for ~2500 English pages in one request |
 | `pages.search(query, locale)` | **works** | Live search index; returns paths, not content |
-| `pages.single(id)` | denied — `PageViewForbidden 6013` | — |
-| `pages.singleByPath(path, locale)` | denied — `PageViewForbidden 6013` | — |
-| `__schema` introspection | disabled by Apollo | — |
+| `pages.single(id)` | denied -- `PageViewForbidden 6013` | -- |
+| `pages.singleByPath(path, locale)` | denied -- `PageViewForbidden 6013` | -- |
+| `__schema` introspection | disabled by Apollo | -- |
 
 So GraphQL answers *what exists and when it changed*, but never *what it says*.
 Content has to come from the public HTML at `https://wiki.bambulab.com/en/<path>`.
-That split is why the tool is a hybrid rather than a pure GraphQL client — and
+That split is why the tool is a hybrid rather than a pure GraphQL client -- and
 why staleness checking is nearly free while content sync is the expensive part.
 
 `robots.txt` is empty, so nothing is disallowed. Be polite anyway: the defaults
@@ -46,7 +46,7 @@ still exits 0. `--retry-failed` re-attempts them. The point is that a non-zero
 exit keeps meaning "something new broke".
 
 `status` also reports pages that exist locally but have disappeared from the
-wiki. They are left in place rather than deleted — losing a page that was merely
+wiki. They are left in place rather than deleted -- losing a page that was merely
 renamed is worse than carrying a stale one, and the report makes the situation
 visible either way.
 
@@ -59,8 +59,8 @@ $BAMBU_WIKI_DIR            (default ~/.cache/bambu-wiki)
     └── software/bambu-studio/layer-height.md
 ```
 
-Each file carries YAML front matter — `title`, `path`, `url`, `wiki_id`,
-`updated_at`, `description`, `source` — followed by the article as Markdown.
+Each file carries YAML front matter -- `title`, `path`, `url`, `wiki_id`,
+`updated_at`, `description`, `source` -- followed by the article as Markdown.
 Front matter is there so a retrieved chunk can cite its source URL and its age,
 which is the difference between a citation and an assertion.
 
@@ -73,14 +73,14 @@ every document and make a vector index retrieve on it.
 
 Default sections are the ones that answer settings questions:
 `software`, `bambu-studio`, `knowledge-sharing`, `filament`, `filament-acc`,
-`h2`, `h2d`, `h2d-pro`, `general`, `ams*`, `parts-acc`, `studio-handy`, `miniwiki` — about 1000 of ~2500 English pages, roughly 10 MB. The remainder is
+`h2`, `h2d`, `h2d-pro`, `general`, `ams*`, `parts-acc`, `studio-handy`, `miniwiki` -- about 1000 of ~2500 English pages, roughly 10 MB. The remainder is
 largely per-model packing, teardown, and replacement guides that add bulk to a
 RAG index without improving settings answers.
 
 The wiki's top-level namespace is untidy: Bambu Studio material lives
 under both `software/` and `bambu-studio/`, and filament guides under both
 `filament/` and `filament-acc/`. If a `search` hit comes back without the `*`
-that marks a local copy, the section is missing from your scope — that is the
+that marks a local copy, the section is missing from your scope -- that is the
 signal to widen it, and it is worth checking rather than assuming coverage.
 
 ```bash
@@ -103,7 +103,7 @@ python3 wiki_sync.py hms 0300_1800 --printer a1 # rank another model first
 ```
 
 Lookup normalizes both sides to hex digits only, accepts a prefix, and ranks the
-H2D family first by default — the same code is documented per model and the
+H2D family first by default -- the same code is documented per model and the
 troubleshooting steps genuinely differ with the hardware. Codes outside the sync
 scope are not local; the command says so and suggests `--all-sections`.
 
@@ -116,13 +116,13 @@ python3 wiki_sync.py sync --section software,bambu-studio,knowledge-sharing --im
 ```
 
 Measured: mirroring figures for the **whole** wiki runs to **~5.4 GB**, because
-maintenance and teardown pages carry full-resolution photos and 20–30 MB animated
+maintenance and teardown pages carry full-resolution photos and 20-30 MB animated
 GIFs. Restricted to the sections that answer settings questions (software,
-bambu-studio, knowledge-sharing, filament, filament-acc — 343 pages) it is about
+bambu-studio, knowledge-sharing, filament, filament-acc -- 343 pages) it is about
 750 MB at a 1 MB cap, **395 MB at the 500 KB default**, or 130 MB at 200 KB.
 Median figure is 170 KB.
 
-The figures worth having are the Bambu Studio UI screenshots — articles routinely
+The figures worth having are the Bambu Studio UI screenshots -- articles routinely
 say "set it here" beside one, so the image carries the location and the prose does
 not. Those sit well under the default cap. Anything larger keeps its remote URL
 rather than being dropped, so nothing is lost, only deferred to the network.
@@ -137,7 +137,7 @@ local rendering changed and `updatedAt` cannot express that.
 **Primary mechanism: a hook tied to actual use.** A `PreToolUse` hook on the
 `Skill` tool runs `autorefresh` whenever print-tune-bambu is invoked. It ships
 with the plugin at `hooks/hooks.json` and registers automatically when the plugin
-is enabled — nothing to add to `.claude/settings.json` by hand:
+is enabled -- nothing to add to `.claude/settings.json` by hand:
 
 ```json
 { "matcher": "Skill",
@@ -149,8 +149,8 @@ is enabled — nothing to add to `.claude/settings.json` by hand:
 Two details differ from the project-owned form this used to take. The path is
 `${CLAUDE_PLUGIN_ROOT}`, not `$CLAUDE_PROJECT_DIR`, because a plugin resolves
 against wherever it was installed rather than against a repository. And the skill
-match is `test(...)` rather than `==`, because a plugin skill arrives namespaced —
-`print-tune-bambu:print-tune-bambu` — while the same skill loaded from a project
+match is `test(...)` rather than `==`, because a plugin skill arrives namespaced --
+`print-tune-bambu:print-tune-bambu` -- while the same skill loaded from a project
 directory arrives bare. The substring test covers both, so the hook keeps working
 whichever way the skill is being loaded.
 
@@ -159,10 +159,10 @@ matter and never when it cannot. Three properties make it safe to sit in front o
 every invocation:
 
 - **Nearly free.** A `.last-check` timestamp short-circuits all but the first run
-  per interval — ~0.1 s. When it does check, one GraphQL request, ~0.5 s.
+  per interval -- ~0.1 s. When it does check, one GraphQL request, ~0.5 s.
 - **Never blocks.** If pages are stale the sync is spawned detached
   (`start_new_session`) and the hook returns immediately.
-- **Never fails the tool call.** Offline, DNS failure, unreachable wiki — all
+- **Never fails the tool call.** Offline, DNS failure, unreachable wiki -- all
   caught and reported as context. `|| true` is the last line of defence.
 
 It reports through `hookSpecificOutput.additionalContext`, so the model is *told*
@@ -177,7 +177,7 @@ python3 wiki_sync.py autorefresh --interval 3600  # check hourly instead of dail
 ```
 
 **Alternative: a launchd timer.** Still available for refreshing regardless of
-use — worth it only if something other than this skill consumes the mirror (a
+use -- worth it only if something other than this skill consumes the mirror (a
 vector index, a filesystem MCP server).
 
 ```bash
@@ -207,5 +207,5 @@ Neither path passes `--images`; add it to the plist or run a manual sync.
 - Some articles are `contentType: html` rather than `markdown`; conversion is
   best-effort and those can come out less tidy.
 - A page whose HTML lacks the expected container is reported as a failure rather
-  than written empty — an empty file in a RAG corpus is worse than a missing one,
+  than written empty -- an empty file in a RAG corpus is worse than a missing one,
   because it retrieves and says nothing.
