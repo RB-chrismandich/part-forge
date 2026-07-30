@@ -9,8 +9,9 @@ Numbers below are read from Bambu's own H2D filament presets and are here for
 orientation. Re-read the actual preset for the actual spool:
 
 ```bash
-python3 bambu_profiles.py --kind filament list --printer 'H2D(?!P)'
-python3 bambu_profiles.py --kind filament get "Bambu PETG-CF @BBL H2D 0.4 nozzle" \
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/bambu_profiles.py" --kind filament list --printer 'H2D(?!P)'
+python3 "$S/bambu_profiles.py" --kind filament get "Bambu PETG-CF @BBL H2D 0.4 nozzle" \
     nozzle_temperature hot_plate_temp chamber_temperatures filament_max_volumetric_speed \
     fan_max_speed temperature_vitrification filament_dev_ams_drying_temperature
 ```

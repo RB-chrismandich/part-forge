@@ -79,9 +79,19 @@ A bare `scripts/part_kit.py` is acceptable **only** as a prose citation naming w
 function lives — never inside a runnable block. The distinction is whether someone could
 paste the line and expect it to work.
 
-`references/*.md` in print-tune-bambu currently violate this in 23 places, showing bare
-`wiki_sync.py` inside bash fences. `repo_check.py` reports them as warnings. They are the
-standing exception, not the precedent.
+`repo_check.py` reports a bare invocation as a `hardcoded-script-path` warning. The corpus
+is clean; there is no standing exception to point at any more, so a new warning here is a
+new mistake rather than company. print-tune-bambu's references carried 23 of these for a
+while — long enough that the count had been written down as a fact of the repo, which is
+how a warning becomes furniture.
+
+Set the path once at the top of the fence and reuse it, so the block survives being
+pasted whole:
+
+```bash
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" status
+```
 
 ## Prose conventions
 

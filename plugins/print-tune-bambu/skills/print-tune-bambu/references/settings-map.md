@@ -188,7 +188,8 @@ Temperature, cooling, flow, retraction and drying live in the **filament**
 preset, not the process preset. Query them the same way:
 
 ```bash
-python3 bambu_profiles.py --kind filament get "Bambu PETG-CF @BBL H2D 0.4 nozzle" \
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/bambu_profiles.py" --kind filament get "Bambu PETG-CF @BBL H2D 0.4 nozzle" \
     nozzle_temperature hot_plate_temp chamber_temperature filament_max_volumetric_speed
 ```
 
@@ -201,8 +202,9 @@ Common filament keys: `nozzle_temperature`, `nozzle_temperature_initial_layer`,
 ## Finding a key you cannot see here
 
 ```bash
-python3 bambu_profiles.py keys 'ironing'       # search the whole vocabulary
-python3 bambu_profiles.py trace "<preset>" <key>   # who set it, and to what
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/bambu_profiles.py" keys 'ironing'       # search the whole vocabulary
+python3 "$S/bambu_profiles.py" trace "<preset>" <key>   # who set it, and to what
 ```
 
 If a key comes back only as *candidate*, the reliable confirmation is empirical:

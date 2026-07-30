@@ -456,15 +456,23 @@ def check_plugin_root_var(root: Path, rep: Report) -> None:
         shipped = {p.name for p in plugin.rglob("*.py")}
         text = read(path)
         for lineno, line in enumerate(text.split("\n"), 1):
-            if "CLAUDE_PLUGIN_ROOT" in line or "$S/" in line:
-                continue
-            m = re.search(r"python3?\s+((?:[\w.\-]+/)*[\w.\-]+\.py)", line)
+            # The optional quote and the ${} / $S segments matter: without them
+            # the compliant form `python3 "$S/x.py"` does not match at all, so
+            # only violations were ever seen -- and a check that cannot see a
+            # pass cannot report honest coverage.
+            m = re.search(r"""python3?\s+["']?((?:[\w.\-${}]+/)*[\w.\-]+\.py)""", line)
             if not m:
                 continue
             frag = m.group(1)
             if Path(frag).name not in shipped:
                 continue
+            # Counted per invocation examined, not per violation found. Counting
+            # only failures makes the total fall as the repo gets healthier --
+            # fixing 23 warnings dropped "221 checks" to 198, which reads like
+            # coverage was lost rather than gained.
             rep.checks_run += 1
+            if "CLAUDE_PLUGIN_ROOT" in line or "$S/" in line:
+                continue
             rep.warn(
                 "hardcoded-script-path",
                 f"{path}:{lineno}",

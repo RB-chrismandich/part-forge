@@ -35,9 +35,10 @@ timestamp moved, or if its file went missing. Nothing else is refetched, so a
 routine `sync` after the first one costs a handful of requests.
 
 ```bash
-python3 wiki_sync.py status          # one GraphQL request, no page fetches
-python3 wiki_sync.py sync            # fetch only the stale ones
-python3 wiki_sync.py sync --dry-run  # list what would be fetched
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" status          # one GraphQL request, no page fetches
+python3 "$S/wiki_sync.py" sync            # fetch only the stale ones
+python3 "$S/wiki_sync.py" sync --dry-run  # list what would be fetched
 ```
 
 A page the wiki lists but refuses to serve anonymously (currently one HMS error
@@ -84,9 +85,10 @@ that marks a local copy, the section is missing from your scope -- that is the
 signal to widen it, and it is worth checking rather than assuming coverage.
 
 ```bash
-python3 wiki_sync.py sync --section x1,p1     # other printers
-python3 wiki_sync.py sync --all-sections      # everything
-python3 wiki_sync.py --locale zh status       # other locales exist
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" sync --section x1,p1     # other printers
+python3 "$S/wiki_sync.py" sync --all-sections      # everything
+python3 "$S/wiki_sync.py" --locale zh status       # other locales exist
 ```
 
 ## HMS error-code lookup
@@ -97,9 +99,10 @@ plain `troubleshooting/` depending on the printer. The page title adds an
 `HMS_` prefix. The printer screen shows it differently again.
 
 ```bash
-python3 wiki_sync.py hms HMS_0300_9500_0001_0005 --show
-python3 wiki_sync.py hms 0300-9500              # partial prefix is fine
-python3 wiki_sync.py hms 0300_1800 --printer a1 # rank another model first
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" hms HMS_0300_9500_0001_0005 --show
+python3 "$S/wiki_sync.py" hms 0300-9500              # partial prefix is fine
+python3 "$S/wiki_sync.py" hms 0300_1800 --printer a1 # rank another model first
 ```
 
 Lookup normalizes both sides to hex digits only, accepts a prefix, and ranks the
@@ -112,7 +115,8 @@ scope are not local; the command says so and suggests `--all-sections`.
 Off by default, and the reason is cost rather than principle.
 
 ```bash
-python3 wiki_sync.py sync --section software,bambu-studio,knowledge-sharing --images
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" sync --section software,bambu-studio,knowledge-sharing --images
 ```
 
 Measured: mirroring figures for the **whole** wiki runs to **~5.4 GB**, because
@@ -171,9 +175,10 @@ refresh would be worse than none: the model would quote stale text believing it
 current.
 
 ```bash
-python3 wiki_sync.py autorefresh --force          # ignore the throttle
-python3 wiki_sync.py autorefresh --no-background  # report only, do not sync
-python3 wiki_sync.py autorefresh --interval 3600  # check hourly instead of daily
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" autorefresh --force          # ignore the throttle
+python3 "$S/wiki_sync.py" autorefresh --no-background  # report only, do not sync
+python3 "$S/wiki_sync.py" autorefresh --interval 3600  # check hourly instead of daily
 ```
 
 **Alternative: a launchd timer.** Still available for refreshing regardless of
@@ -181,10 +186,11 @@ use -- worth it only if something other than this skill consumes the mirror (a
 vector index, a filesystem MCP server).
 
 ```bash
-python3 wiki_sync.py agent install     # weekly, Tue 09:41
-python3 wiki_sync.py agent status      # loaded? what did the last run say?
-python3 wiki_sync.py agent install --print-only   # inspect the plist first
-python3 wiki_sync.py agent uninstall
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" agent install     # weekly, Tue 09:41
+python3 "$S/wiki_sync.py" agent status      # loaded? what did the last run say?
+python3 "$S/wiki_sync.py" agent install --print-only   # inspect the plist first
+python3 "$S/wiki_sync.py" agent uninstall
 ```
 
 Neither path passes `--images`; add it to the plist or run a manual sync.

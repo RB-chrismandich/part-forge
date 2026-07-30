@@ -3,7 +3,8 @@
 Verify anything here against the local install rather than trusting the page:
 
 ```bash
-python3 bambu_profiles.py --kind machine get "Bambu Lab H2D 0.4 nozzle" \
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/bambu_profiles.py" --kind machine get "Bambu Lab H2D 0.4 nozzle" \
     printable_area extruder_printable_area machine_max_acceleration_extruding \
     machine_max_speed_x nozzle_diameter extruder_variant_list
 ```
