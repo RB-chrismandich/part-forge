@@ -1,6 +1,6 @@
 ---
 name: print-tune-bambu
-description: Recommend Bambu Studio print settings for a part and emit an importable process preset. Use when slicing an STL/3MF, tuning for a material (PLA, PETG-CF, ABS, PA, TPU), fixing a failed print (warping, drooping overhangs, weak layers), or asking what a Bambu Studio setting does. Reads stock values from the local install.
+description: Recommend Bambu Studio print settings for a part and emit an importable process preset. Use when slicing an STL/3MF, tuning for a material (PLA, PETG-CF, ABS, PA, TPU), fixing a failed print (warping, drooping overhangs, ragged engraved detail, weak layers), when the only evidence is a photograph of the defect, or when asking what a Bambu Studio setting does. Reads stock values from the local install.
 ---
 
 # Bambu Studio print settings
@@ -21,12 +21,25 @@ Do not skip this — a settings answer with the wrong material in it is worse
 than no answer, because it looks authoritative.
 
 1. **Printer and nozzle.** Default to the **Bambu Lab H2D with a 0.4 mm nozzle**
-   unless told otherwise. If the part is abrasive-filled (CF/GF), confirm a
-   hardened nozzle is fitted.
+   unless told otherwise. If the part is abrasive-filled (CF/GF, and most matte
+   or metal-fill blends), confirm a hardened nozzle is fitted. Do not treat the
+   nozzle as fixed just because it is what is installed: `inspect_model.py`
+   measures whether it can resolve this model at all, and reports the answer as
+   `pct_failing_by_nozzle`. **Say so when it cannot** — that finding outranks
+   every setting in the brief, because no setting recovers geometry the nozzle
+   cannot draw.
 2. **Filament — always confirm this, never infer it.** "PETG" and "PETG-CF" want
    different walls, different support gaps, and a different nozzle. If the user
    has not named the exact spool, ask. This is a standing instruction from the
    user of this skill, not a nicety.
+
+   Then check the named spool is right for the job rather than accepting it. A
+   part that will sit in a car does not want PLA whatever the user loaded, and a
+   part under months of constant load does not want it either — PLA creeps at
+   room temperature. `references/material-and-nozzle-selection.md` picks both
+   filament and nozzle from what the part must survive and what the model's
+   geometry demands, and prices the flow-against-resolution trade that makes
+   "just use a smaller nozzle" an expensive sentence.
 3. **What the part has to survive.** Load direction, temperature, UV, water,
    fit tolerance, whether a visible face matters. This is the entire basis for
    every deviation from stock.
@@ -98,12 +111,38 @@ If a file was provided, run it. Claims like "steep overhangs" or "tall and tippy
 should come from numbers, so the recommendation can cite them.
 
 ```bash
-python3 $S/inspect_model.py --pretty part.stl     # .stl / .3mf / .obj, add nothing else
+python3 $S/inspect_model.py --pretty part.stl                    # .stl / .3mf / .obj
+python3 $S/inspect_model.py --pretty part.stl --line-width 0.6   # judge against a 0.6 nozzle
 ```
 
 It reports bounding box, volume, bed-contact area, downward-face area split by
 slope band (Bambu's threshold-angle convention: 0° = flat down, 90° = vertical),
-bridge spans, tipping aspect ratio, and watertightness.
+bridge spans, tipping aspect ratio, watertightness, and **narrow features**.
+
+That last one answers the question a photograph never can: how much of the part
+is detail this nozzle cannot draw. It measures groove and rib widths **in the
+slicing plane**, because that is the only width the slicer ever sees — a groove
+running at 45° to Z has an in-plane width 1.41× its perpendicular one, and a 3D
+nearest-surface query condemns grooves that print perfectly. Judge it by
+`pct_of_wall_area`, not by `min_mm`: every chamfer is a gap that closes, so the
+minimum tends to the touch epsilon on any real part and means almost nothing. A
+few percent is a face tapering out to an edge and is inherent to the shape;
+tens of percent is detail below the nozzle's resolution. `--line-width` sets the
+threshold, and it must match the preset you are actually recommending.
+
+One limit worth stating in the answer rather than discovering later: the
+reported `layer_pitch_mm` is the resolution, so detail confined to a thinner z
+band can fall between cross-sections. A clean result at a coarse pitch means
+"not seen", not "not there" — the tool says so itself when that risk is real,
+and `--narrow-layers` is the answer.
+
+Overlapping un-booleaned bodies are handled rather than assumed away: facets
+buried inside the solid are excluded by the same nonzero-winding rule the slicer
+unions with, so a brick modelled as two boxes overlapping by 0.3 mm reports no
+ribs. The two preconditions this rests on — a closed surface and consistent
+winding — are both measured, and the numbers are withheld with a reason when
+either fails, so `winding_consistent: false` is a repair instruction rather than
+a silently wrong figure. part-forge's `mesh_audit.py` remains the fuller audit.
 
 Read the flags first. A **non-watertight mesh is a stop sign** — no amount of
 setting tuning fixes missing walls or phantom infill, so say so and point at the
@@ -132,11 +171,22 @@ python3 $S/slice_check.py check part.stl \
 python3 $S/slice_check.py compare part.stl \
     --machine "Bambu Lab X1 Carbon 0.4 nozzle" --filament "Bambu PLA Basic @BBL X1C" \
     --base "0.20mm Standard @BBL X1C" --candidate "0.20mm Strength @BBL X1C"
+
+python3 $S/slice_check.py features ~/.cache/bambu-slice/check
 ```
 
 `compare` is the one that earns its keep — it turns "more walls costs some time"
 into "+32% time, +96% mass, inner wall +827 s, sparse infill −306 s". That is the
 trade the user was asked to accept, stated in the units they care about.
+
+`features` answers a different question: not what the print costs, but **what the
+slicer decided the geometry was**. It reads the gcode's own `; FEATURE:` markers
+and reports extrusion length, share and z range per feature — Studio's "Line
+type" preview as numbers. Reach for it when a defect is localized, because the
+feature list names the mechanism: `Gap infill` means geometry too narrow for two
+walls, and its z range says which detail is failing. Do not substitute
+`feature_type_times` for this; it ranks by time, which buries every diagnostic
+feature, and it omits `Floating vertical shell` altogether.
 
 **The H2D cannot be sliced this way.** The CLI has no flag to map filaments to
 nozzles, so any multi-extruder machine fails with `return_code -66`; single-
@@ -145,6 +195,35 @@ exported from Bambu Studio** (it carries the mapping the GUI assigned) or slice
 a single-extruder proxy and report the delta as *relative* — say so if you do,
 since a proxy number presented as an H2D number is exactly the confident-wrong
 claim this skill exists to avoid.
+
+## Step 2c — when the evidence is a photograph
+
+Most failed-print questions arrive as a photo and no file. A photo is real
+evidence and worth reading closely, but it supports one kind of claim: **where on
+the part the defect is**. It cannot tell you the feature's width, the layer
+height, or the material, and a diagnosis that quietly assumes those is the
+confident-wrong answer this skill exists to prevent.
+
+Settle three things before naming a mechanism.
+
+1. **Is the defect local or global?** The most valuable question in the picture,
+   and the one generic advice never asks. Temperature, moisture and cooling act
+   on the whole part — they cannot wreck one groove and leave the skin two
+   millimetres away flawless. An intact surface beside the damage rules them out
+   and points at geometry.
+2. **Which feature class is damaged** — an overhang underside, a bridge ceiling,
+   a groove rim, a top skin, a seam. `references/failure-modes.md` opens with a
+   triage table keyed on exactly this, because one vocabulary ("droopy", "messy",
+   "ragged") covers four unrelated mechanisms whose fixes conflict.
+3. **How big is the feature, in line widths?** Unanswerable from a photo and
+   usually the entire answer. **Ask for the STL** — this is the one question
+   worth blocking on, because `inspect_model.py` then measures groove and rib
+   widths directly (Step 2) and replaces the whole settings discussion with a
+   number. Failing that, ask for a caliper reading of the narrowest groove.
+
+Then pin the four facts anyway. A photo makes it tempting to skip them because
+the symptom looks self-evident; the same picture has different fixes in PLA and
+in ABS, and a photo cannot tell you which is on the plate.
 
 ## Step 3 — choose the base preset, then change as little as possible
 
@@ -215,6 +294,9 @@ before handing the preset over.
   example, the full H2D per-variant slot table, and the validate/install commands.
 - `references/failure-modes.md` — symptom or requirement → the lever that fixes
   it, and why. Read this for anything beyond layer height and walls.
+- `references/material-and-nozzle-selection.md` — choosing the filament from what
+  the part must survive and the nozzle from what the model's finest features
+  demand, plus the volumetric-flow arithmetic that prices a finer nozzle in hours.
 - `references/settings-map.md` — Bambu Studio UI label ↔ JSON key, grouped by
   the page it lives on. Read this when writing a preset or telling someone where
   to click.

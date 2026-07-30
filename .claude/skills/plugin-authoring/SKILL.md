@@ -79,9 +79,19 @@ A bare `scripts/part_kit.py` is acceptable **only** as a prose citation naming w
 function lives — never inside a runnable block. The distinction is whether someone could
 paste the line and expect it to work.
 
-`references/*.md` in print-tune-bambu currently violate this in 23 places, showing bare
-`wiki_sync.py` inside bash fences. `repo_check.py` reports them as warnings. They are the
-standing exception, not the precedent.
+`repo_check.py` reports a bare invocation as a `hardcoded-script-path` warning. The corpus
+is clean; there is no standing exception to point at any more, so a new warning here is a
+new mistake rather than company. print-tune-bambu's references carried 23 of these for a
+while — long enough that the count had been written down as a fact of the repo, which is
+how a warning becomes furniture.
+
+Set the path once at the top of the fence and reuse it, so the block survives being
+pasted whole:
+
+```bash
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/wiki_sync.py" status
+```
 
 ## Prose conventions
 
@@ -90,8 +100,17 @@ Lines wrap at 90 columns. Tables and fences run long and are exempt.
 The H1 is a sentence-case fragment naming the activity — "The gate that decides whether a
 solid ships" — never a title-cased noun phrase.
 
-Dashes split by depth, and the split is enforced: **em-dash `—` in `SKILL.md` and
-`agents/*.md`; ASCII `--` everywhere under `references/`, `templates/`, `examples/`.**
+Dashes split by depth: **em-dash `—` in `SKILL.md` and `agents/*.md`; ASCII `--` (and
+`-`, never `–`) everywhere under `references/`, `templates/`, `examples/`.** The ASCII
+half is enforced by `repo_check.py`'s `dash-convention`, which exempts code fences —
+those carry literal program output, and rewriting a dash there would make the sample
+disagree with the tool that printed it.
+
+This rule described itself as enforced for a while before it was. part-forge's twelve
+reference files honoured it; print-tune-bambu's eight had drifted to 130 typographic
+dashes, and nothing said so. A convention documented as enforced but unchecked is worse
+than one documented as a preference, because the prose promises a guarantee the repo
+does not keep.
 
 Tables carry legends, checklists, tolerance regimes and parameter lists. Prose carries
 reasoning. A table of prose is neither.

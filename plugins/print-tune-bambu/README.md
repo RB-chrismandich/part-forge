@@ -33,8 +33,10 @@ the user was actually asked to accept.
 |---|---|
 | `print-tune-bambu` | The method: pin down four facts, read real stock values, measure the mesh, slice to verify, then change only what a named failure mode justifies. |
 
-Eight reference files sit behind it and are read on demand: `failure-modes.md` (symptom → lever,
-and why), `settings-map.md` (Studio UI label ↔ JSON key), `materials.md` (what each filament
+Nine reference files sit behind it and are read on demand: `failure-modes.md` (symptom → lever,
+and why), `material-and-nozzle-selection.md` (filament from what the part must survive, nozzle
+from what the geometry demands, and the flow-versus-resolution trade priced in hours),
+`settings-map.md` (Studio UI label ↔ JSON key), `materials.md` (what each filament
 family constrains), `h2d.md` (dual-nozzle envelope and the per-variant array convention),
 `output-format.md` (brief template, preset JSON, validate/install), `slice-verification.md`,
 `wiki-mirror.md`, and `generator-handoff.md`.
@@ -44,8 +46,8 @@ family constrains), `h2d.md` (dual-nozzle envelope and the per-variant array con
 | Script | Purpose |
 |---|---|
 | `bambu_profiles.py` | Resolves Studio's preset inheritance from the local install. `root`, `list`, `get`, `trace`, `resolve`, `keys`, `user-list`, `validate`, `install`. |
-| `inspect_model.py` | Measures an STL/3MF/OBJ: bounding box, volume, bed contact, downward-face area by slope band, bridge spans, tipping ratio, watertightness. |
-| `slice_check.py` | Drives Studio's headless CLI and reads back what the slicer *did*. `check` for one preset, `compare` for a base-versus-candidate delta. |
+| `inspect_model.py` | Measures an STL/3MF/OBJ: bounding box, volume, bed contact, downward-face area by slope band, bridge spans, tipping ratio, watertightness, and narrow features — groove and rib widths measured in the slicing plane and judged against a line width, which is what decides whether engraved detail is printable at all. |
+| `slice_check.py` | Drives Studio's headless CLI and reads back what the slicer *did*. `check` for one preset, `compare` for a base-versus-candidate delta, `features` for the gcode's own `; FEATURE:` markers — extrusion, share and z range per feature, which is Studio's "Line type" preview as numbers. |
 | `wiki_sync.py` | Maintains the local wiki mirror. `status`, `sync`, `search`, `grep`, `show`, `hms`, `autorefresh`, `agent`. |
 
 ### Hook

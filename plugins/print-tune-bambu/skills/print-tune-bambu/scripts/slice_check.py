@@ -8,11 +8,20 @@ settings it actually applied, the predicted print time broken down by feature,
 filament consumed, and its own warnings about the geometry. That turns a
 recommendation into a measurement.
 
-    check    slice once and summarize
-    compare  slice the same model under two process presets and diff them
+    check     slice once and summarize
+    compare   slice the same model under two process presets and diff them
+    features  read the gcode's own `; FEATURE:` markers — what was laid down,
+              how much of it, and over which z range
 
-Both read `result.json`, so "outer wall time went from 645 s to 1130 s" is a fact
-rather than an estimate.
+`check` and `compare` read `result.json`, so "outer wall time went from 645 s to
+1130 s" is a fact rather than an estimate.
+
+`features` reads the gcode instead, and is not a restatement of the same data.
+`result.json`'s `feature_type_times` adds `Travel` and `Undefined` buckets that
+no marker produces, and omits `Floating vertical shell` entirely. It also ranks
+by time, which buries the features that diagnose a defect rather than consume
+minutes — `Gap infill` is 1% of extrusion and the entire explanation for ragged
+narrow detail. `features` is Studio's "Line type" preview as numbers.
 
 ## A real limitation, worth knowing before you rely on this
 
@@ -248,6 +257,117 @@ def _first(value):
     return value
 
 
+# Features that rarely place in the top 6 by time, yet each names a specific
+# defect mechanism. `Gap infill` in particular is the numeric signature of
+# geometry too narrow for two walls — see failure-modes.md, "Engraved detail
+# prints ragged". Reporting them by time alone hides exactly the ones worth
+# seeing, so they are surfaced regardless of rank.
+DETAIL_RISK = (
+    "Gap infill",
+    "Overhang wall",
+    "Bridge",
+    "Thin wall",
+    "Floating vertical shell",
+)
+
+
+def gcode_features(gcode: Path) -> dict:
+    """Per-feature extrusion, block count and Z range, read from the gcode.
+
+    This is Bambu Studio's own "Line type" preview expressed as numbers, and it
+    exists because `result.json`'s `feature_type_times` is a *different set*,
+    not a summary of this one. That JSON invents `Travel` and `Undefined`
+    buckets no marker produces, and it omits `Floating vertical shell`
+    altogether — 153 mm of extrusion on the fixture saddle that the time
+    breakdown never mentions. The markers are the only account of what the
+    slicer actually laid down.
+
+    Marker spelling was taken from real output of Studio 02.07.01.57, which
+    emits `; FEATURE: <name>` and `; CHANGE_LAYER` / `; Z_HEIGHT:`. It does not
+    emit the `;TYPE:` form used by other slicers, so do not match on that.
+    """
+    feats: dict[str, dict] = {}
+    cur = None
+    z = 0.0
+    relative = True  # Bambu sets M83 near the top; M82 handled for safety
+    last_e = 0.0
+
+    with gcode.open(encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if line.startswith(";"):
+                if line.startswith("; FEATURE:"):
+                    cur = line.split(":", 1)[1].strip()
+                    rec = feats.setdefault(
+                        cur, {"blocks": 0, "mm": 0.0, "z_min": None, "z_max": None}
+                    )
+                    rec["blocks"] += 1
+                elif line.startswith("; Z_HEIGHT:"):
+                    try:
+                        z = float(line.split(":", 1)[1])
+                    except ValueError:
+                        pass
+                continue
+            if line.startswith("M83"):
+                relative = True
+                continue
+            if line.startswith("M82"):
+                relative = False
+                continue
+            if line.startswith("G92") and " E" in line:
+                last_e = 0.0
+                continue
+            if not line.startswith("G1 ") or cur is None:
+                continue
+            e = None
+            # Strip any trailing comment first: a word like "; External perimeter"
+            # would otherwise be tokenised and read as an E value.
+            for tok in line.split(";", 1)[0].split():
+                if tok.startswith("E"):
+                    try:
+                        e = float(tok[1:])
+                    except ValueError:
+                        e = None
+                    break
+            if e is None:
+                continue
+            delta = e if relative else e - last_e
+            if not relative:
+                last_e = e
+            if delta > 0:
+                rec = feats[cur]
+                rec["mm"] += delta
+                rec["z_min"] = z if rec["z_min"] is None else min(rec["z_min"], z)
+                rec["z_max"] = z if rec["z_max"] is None else max(rec["z_max"], z)
+    return feats
+
+
+def print_features(label: str, feats: dict) -> None:
+    total = sum(f["mm"] for f in feats.values()) or 1.0
+    print(f"\n=== {label} ===")
+    if not feats:
+        print("  no '; FEATURE:' markers found — is this a Bambu Studio gcode?")
+        return
+    print(f"  {'feature':<26}{'extruded':>11}{'share':>8}{'blocks':>8}   z range")
+    for name, f in sorted(feats.items(), key=lambda kv: -kv[1]["mm"]):
+        zr = (
+            f"{f['z_min']:.2f}–{f['z_max']:.2f} mm"
+            if f["z_min"] is not None
+            else "—"
+        )
+        mark = " *" if name in DETAIL_RISK else ""
+        print(
+            f"  {name:<26}{f['mm']:>9.1f} mm{100 * f['mm'] / total:>7.1f}%"
+            f"{f['blocks']:>8}   {zr}{mark}"
+        )
+    risky = [n for n in feats if n in DETAIL_RISK]
+    if risky:
+        print(
+            "\n  * these features each name a defect mechanism rather than a\n"
+            "    quantity of work. Gap infill means geometry too narrow for two\n"
+            "    walls; its z range localises which detail is failing."
+        )
+
+
 def summarize(
     result: dict, outdir: Path | None = None, filament: Path | None = None
 ) -> dict:
@@ -291,12 +411,18 @@ def print_summary(label: str, s: dict) -> None:
     mass = f" · {s['grams']} g" if s["grams"] else " · mass unavailable"
     print(f"  estimate: {fmt_hms(s['seconds'])}{mass}")
     if s["feature_times"]:
-        top = sorted(s["feature_times"].items(), key=lambda kv: -kv[1])[:6]
+        ranked = sorted(s["feature_times"].items(), key=lambda kv: -kv[1])
         print("  time by feature:")
-        for name, secs in top:
+        for name, secs in ranked[:6]:
             print(
                 f"    {name:<24} {fmt_hms(secs):>8}  ({100 * secs / s['seconds']:.0f}%)"
             )
+        # Ranking by time buries the diagnostic features: Gap infill is seconds
+        # of work and the whole diagnosis for ragged narrow detail. Surface them
+        # even when they place nowhere.
+        buried = [(n, t) for n, t in ranked[6:] if n in DETAIL_RISK and t > 0]
+        for name, secs in buried:
+            print(f"    {name:<24} {fmt_hms(secs):>8}  (diagnostic)")
     if s["warning"]:
         print(f"  slicer warning: {s['warning']}")
 
@@ -317,7 +443,11 @@ def _presets(args) -> tuple[Path | None, Path | None, Path | None]:
 
 
 def cmd_check(args) -> None:
-    model = Path(args.model).expanduser()
+    # resolve(), not just expanduser(): the CLI runs from a scratch dir under
+    # $HOME, so a relative path that was valid when you typed it resolves against
+    # the wrong directory there and comes back as "The input files to the slicer
+    # are not found" -- which reads like a missing model, not a path problem.
+    model = Path(args.model).expanduser().resolve()
     if not model.is_file():
         die(f"no such model: {model}")
     machine, process, filament = _presets(args)
@@ -338,7 +468,7 @@ def cmd_check(args) -> None:
 
 
 def cmd_compare(args) -> None:
-    model = Path(args.model).expanduser()
+    model = Path(args.model).expanduser().resolve()  # see cmd_check
     if not model.is_file():
         die(f"no such model: {model}")
     machine, _, filament = _presets(args)
@@ -398,6 +528,15 @@ def cmd_compare(args) -> None:
             print(f"    {name:<24} {d:+8.0f} s")
 
 
+def cmd_features(args) -> None:
+    path = Path(args.gcode).expanduser()
+    if path.is_dir():
+        path = path / "plate_1.gcode"
+    if not path.is_file():
+        die(f"no such gcode: {path}  (pass plate_1.gcode or the dir holding it)")
+    print_features(path.name, gcode_features(path))
+
+
 def _explain_failure(s: dict, machine: Path | None) -> None:
     if "multi-extruder" not in (s.get("error") or ""):
         return
@@ -437,8 +576,13 @@ def main() -> None:
     p.add_argument("--base", required=True, help="process preset to measure against")
     p.add_argument("--candidate", required=True, help="process preset being proposed")
 
+    p = sub.add_parser("features")
+    p.add_argument("gcode", help="plate_1.gcode, or the directory holding it")
+
     args = ap.parse_args()
-    {"check": cmd_check, "compare": cmd_compare}[args.cmd](args)
+    {"check": cmd_check, "compare": cmd_compare, "features": cmd_features}[args.cmd](
+        args
+    )
 
 
 if __name__ == "__main__":

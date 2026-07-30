@@ -3,7 +3,8 @@
 Verify anything here against the local install rather than trusting the page:
 
 ```bash
-python3 bambu_profiles.py --kind machine get "Bambu Lab H2D 0.4 nozzle" \
+S="${CLAUDE_PLUGIN_ROOT}/skills/print-tune-bambu/scripts"
+python3 "$S/bambu_profiles.py" --kind machine get "Bambu Lab H2D 0.4 nozzle" \
     printable_area extruder_printable_area machine_max_acceleration_extruding \
     machine_max_speed_x nozzle_diameter extruder_variant_list
 ```
@@ -11,13 +12,13 @@ python3 bambu_profiles.py --kind machine get "Bambu Lab H2D 0.4 nozzle" \
 ## Envelope
 
 - Plate is **350 × 320 mm**, `printable_height` 325 mm, but neither nozzle
-  reaches all of it: `extruder_printable_area` gives the left extruder X 0–325
-  and the right extruder X 25–350. So a single-material print has a 325 × 320
-  window, and a **dual-material print only has the 300 × 320 overlap** (X 25–325).
+  reaches all of it: `extruder_printable_area` gives the left extruder X 0-325
+  and the right extruder X 25-350. So a single-material print has a 325 × 320
+  window, and a **dual-material print only has the 300 × 320 overlap** (X 25-325).
   A wide two-color part placed against either X edge will fail to slice for one
   of the nozzles.
 - Motion: up to 1000 mm/s travel, 20000 mm/s² machine acceleration ceiling.
-  Stock profiles run well below this — see the flow-limit discussion in
+  Stock profiles run well below this -- see the flow-limit discussion in
   `materials.md` for why raising speeds usually achieves nothing.
 - Hotend to 350 °C, heated chamber to 65 °C, so ABS/ASA/PA/PC/PPS-CF are all
   genuinely in scope rather than technically-possible.
@@ -51,7 +52,7 @@ Rules that follow from this:
   stock. That is sometimes right and usually an accident, so state which nozzle
   you assumed the filament is in.
 - The stock arrays are not uniform: `outer_wall_speed` is
-  `["200","500","200","500","500"]` — the high-flow variants are much faster.
+  `["200","500","200","500","500"]` -- the high-flow variants are much faster.
   Copying slot 0's value into all five slots silently halves the machine.
 
 **Filament presets use a different array length.** They are indexed by
@@ -64,7 +65,7 @@ five.
 
 - `enable_prime_tower` is on by default (`prime_tower_width` 60 mm). It is what
   makes color and material changes clean, and it costs real time and filament.
-- Single-material prints do not need it — `enable_prime_tower: "0"` is a
+- Single-material prints do not need it -- `enable_prime_tower: "0"` is a
   legitimate saving, and one of the user's own presets does exactly that.
 - The "Purge into objects' infill / support" checkboxes (`flush_into_infill`,
   `flush_into_support`, `flush_into_objects`) recycle purge into the model
@@ -83,7 +84,7 @@ five.
   `skin_infill_depth`, `infill_lock_depth` split the infill volume into a denser
   outer shell and a sparser core. This gives better stiffness per gram than
   raising `sparse_infill_density` uniformly, and it is not available on older
-  Bambu machines — so advice copied from X1C guides will not mention it.
+  Bambu machines -- so advice copied from X1C guides will not mention it.
 - **Height-based slowdown.** `enable_height_slowdown`, `slowdown_start_height`,
   `slowdown_end_height` and friends taper speed as the part gets tall. Useful for
   the tall-and-skinny parts where `inspect_model.py` flags a high aspect ratio.
@@ -95,4 +96,4 @@ five.
 `@BBL H2D` and `@BBL H2DP` are different preset families. When listing presets,
 filter with `--printer 'H2D(?!P)'` for the base H2D, or the Pro's presets will be
 mixed in and an `inherits` may end up pointing at a preset for a machine the user
-does not have — which imports and then reports as incompatible.
+does not have -- which imports and then reports as incompatible.
