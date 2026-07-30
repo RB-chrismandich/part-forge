@@ -606,7 +606,7 @@ def analyze(tris: list, line_width: float = 0.42, narrow_layers: int = NARROW_MA
                     bed_area += area
                 elif zc >= z_min + BRIDGE_MIN_HEIGHT:
                     bridge_area += area
-                    bridge_pts.extend([a, b, c])
+                    bridge_pts.append((a, b, c))
 
     volume_mm3 = abs(volume6) / 6.0
     open_edges = sum(1 for count in edges.values() if count != 2)
@@ -661,12 +661,47 @@ def analyze(tris: list, line_width: float = 0.42, narrow_layers: int = NARROW_MA
     }
 
     if bridge_pts:
-        bxs = [p[0] for p in bridge_pts]
-        bys = [p[1] for p in bridge_pts]
-        result["largest_bridge_extent_mm"] = {
-            "x": round(max(bxs) - min(bxs), 2),
-            "y": round(max(bys) - min(bys), 2),
-        }
+        # Per connected bridge, not the bounding box of all of them. Taking the
+        # extent of every bridge facet at once measures how far apart the
+        # furthest two bridges on the part are, which is not a span anything has
+        # to cross: on a scale-model hull with 10,001 separate bridge facets it
+        # reported 172.68 mm while the largest actual span was 22.3 mm. This
+        # number is quoted into `max_bridge_length`, so overstating it by 8x
+        # forces supports under spans that would have bridged perfectly.
+        parent: dict = {}
+
+        def find(x):
+            while parent[x] != x:
+                parent[x] = parent[parent[x]]
+                x = parent[x]
+            return x
+
+        def union(x, y):
+            parent.setdefault(x, x)
+            parent.setdefault(y, y)
+            rx, ry = find(x), find(y)
+            if rx != ry:
+                parent[rx] = ry
+
+        for tri in bridge_pts:
+            keys = [_key(p) for p in tri]
+            for k in keys:
+                parent.setdefault(k, k)
+            union(keys[0], keys[1])
+            union(keys[1], keys[2])
+
+        groups: dict = defaultdict(list)
+        for tri in bridge_pts:
+            groups[find(_key(tri[0]))].extend(tri)
+        best = {"x": 0.0, "y": 0.0}
+        for pts in groups.values():
+            xs = [p[0] for p in pts]
+            ys = [p[1] for p in pts]
+            dx, dy = max(xs) - min(xs), max(ys) - min(ys)
+            if max(dx, dy) > max(best["x"], best["y"]):
+                best = {"x": round(dx, 2), "y": round(dy, 2)}
+        result["bridge_count"] = len(groups)
+        result["largest_bridge_extent_mm"] = best
 
     result["flags"] = _flags(result)
     return result

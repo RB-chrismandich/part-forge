@@ -434,6 +434,31 @@ PY
 check "groove and rib widths match an analytic ladder, survive shear, and are not invented inside overlapping solids" \
       "the narrow-feature detector disagrees with arithmetic -- see stderr above"
 
+# The vessel fixture's sealed void is documented as 6 x 6 x 2, so its ceiling is
+# one bridge of exactly 6 x 6 mm. Before clustering, this number was the bounding
+# box of every bridge facet on the part at once -- fine on a fixture with one
+# bridge, 8x overstated on a model with 1197 of them, and quoted straight into
+# max_bridge_length.
+python3 - "$PT" "$VESSEL" <<'PY'
+import sys, pathlib
+sys.path.insert(0, sys.argv[1])
+import inspect_model as im
+
+r = im.analyze(im.LOADERS[".stl"](pathlib.Path(sys.argv[2]) / "gate_coupon_dish.stl"))
+ext = r.get("largest_bridge_extent_mm") or {}
+bad = []
+if r.get("bridge_count") != 1:
+    bad.append(f"bridge_count {r.get('bridge_count')} != 1")
+for axis in ("x", "y"):
+    if abs(ext.get(axis, 0) - 6.0) > 0.01:
+        bad.append(f"bridge extent {axis}={ext.get(axis)} != 6.0")
+if bad:
+    print("; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+check "the sealed void reads as one 6 x 6 mm bridge, not a whole-part bounding box" \
+      "bridge clustering regressed -- see stderr above"
+
 echo
 echo "slice_check gcode features"
 

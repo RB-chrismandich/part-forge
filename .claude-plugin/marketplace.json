@@ -38,7 +38,7 @@
       },
       "category": "development",
       "source": "./plugins/print-tune-bambu",
-      "version": "0.4.1",
+      "version": "0.4.2",
       "homepage": "https://github.com/RB-chrismandich/part-forge",
       "keywords": [
         "3d-printing",

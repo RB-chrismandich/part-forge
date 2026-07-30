@@ -93,7 +93,8 @@ fallback when geometry leaves no choice.
 3. Filament side: full cooling over the bridge layer.
 4. `internal_bridge_support_thickness` for internal bridges over infill.
 5. `max_bridge_length` > 0 to force supports beyond a span you do not trust.
-   `inspect_model.py` reports the actual longest span, so use that number.
+   `inspect_model.py` reports the longest single connected span (`largest_bridge_extent_mm`,
+   with `bridge_count` beside it), so use that number rather than eyeballing it.
 
 ## "Engraved detail prints ragged" -- panel lines, narrow slots, fine ribs
 
