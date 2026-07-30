@@ -232,6 +232,13 @@ TOUCH_EPS = 0.02  # mm
 # Must be far smaller than the narrowest feature worth reporting, so that
 # stepping out of a genuine 0.3 mm slot never lands in the far wall.
 INTERIOR_EPS = 0.001  # mm
+HIST_BIN = 0.01  # mm; width histogram resolution, for re-scoring other nozzles
+# Bambu's line width runs ~1.05x the nozzle. A model is called resolvable when
+# under RESOLVABLE_PCT of its wall area falls below two line widths; a few
+# percent is the feather edge every real part has where a face runs out.
+NOZZLES = (0.2, 0.25, 0.4, 0.6, 0.8)
+LINE_WIDTH_RATIO = 1.05
+RESOLVABLE_PCT = 3.0
 
 
 def _wall_facets(tris: list):
@@ -393,6 +400,11 @@ def _narrow_features(tris: list, line_width: float, max_layers: int) -> dict:
         k: {"min": None, "unresolvable_mm2": 0.0, "ragged_mm2": 0.0, "z": []}
         for k in ("gap", "wall")
     }
+    # Every hit also lands in a width histogram, so the same single pass can be
+    # re-scored against a different nozzle afterwards. Only smaller nozzles are
+    # answerable -- their band is a subset of the one already cast -- but that is
+    # the direction the question always runs when detail is coming out ragged.
+    hist = {k: defaultdict(float) for k in ("gap", "wall")}
 
     # Bucket facets by the planes they span. A triangle is short in z relative to
     # the part, so each plane ends up testing a small fraction of the mesh rather
@@ -468,6 +480,7 @@ def _narrow_features(tris: list, line_width: float, max_layers: int) -> dict:
                     key = "unresolvable_mm2" if hit < floor else "ragged_mm2"
                     rec[key] += probe_area
                     rec["z"].append(z)
+                    hist[kind][int(hit / HIST_BIN)] += probe_area
 
     out = {
         "line_width_mm": round(line_width, 3),
@@ -504,6 +517,28 @@ def _narrow_features(tris: list, line_width: float, max_layers: int) -> dict:
                 round(min(z_hi, max(rec["z"]) + step / 2), 2),
             ]
         out[kind] = entry
+
+    # Re-score the same measurement against every nozzle whose band the cast
+    # already covers. This is what turns "19 % of your walls are too fine" into
+    # "and a 0.4 nozzle is the wrong tool for this model", which is the sentence
+    # the user actually needs.
+    by_nozzle = {}
+    for nozzle in NOZZLES:
+        lw = round(nozzle * LINE_WIDTH_RATIO, 3)
+        if lw > line_width + 1e-9:
+            continue  # a wider band than was cast; no data, so no claim
+        limit = 2.0 * lw
+        failing = sum(
+            area
+            for k in ("gap", "wall")
+            for b, area in hist[k].items()
+            if (b + 0.5) * HIST_BIN < limit
+        )
+        by_nozzle[f"{nozzle:.2f}"] = round(100 * failing / wall_area, 2) if wall_area else 0.0
+    out["pct_failing_by_nozzle"] = by_nozzle
+    resolvable = [n for n, p in by_nozzle.items() if p < RESOLVABLE_PCT]
+    out["smallest_resolvable_nozzle"] = min(resolvable, key=float) if resolvable else None
+    out["resolvable_threshold_pct"] = RESOLVABLE_PCT
     return out
 
 
@@ -705,6 +740,28 @@ def _flags(r: dict) -> list[str]:
             f"— detail in a thinner z band than that would be missed; re-run with "
             "--narrow-layers raised before treating this as clean"
         )
+    # The resolution verdict, before the per-feature detail: whether this nozzle
+    # is the wrong tool for this model, and whether any nozzle is the right one.
+    by_nozzle = nf.get("pct_failing_by_nozzle") or {}
+    here = by_nozzle.get(f"{(lw or 0) / 1.05:.2f}")
+    best = nf.get("smallest_resolvable_nozzle")
+    if by_nozzle and here is not None and here >= RESOLVABLE_PCT:
+        ladder = ", ".join(f"{n} mm -> {p}%" for n, p in sorted(by_nozzle.items()))
+        if best is None:
+            out.append(
+                f"RESOLUTION: {here}% of wall area is finer than this nozzle can draw, and "
+                f"no nozzle down to {min(by_nozzle, key=float)} mm clears "
+                f"{nf['resolvable_threshold_pct']}% ({ladder}) — the detail is below what FDM "
+                "resolves at this size. Scale the model up, or accept losing it; no setting "
+                "recovers geometry the nozzle cannot draw"
+            )
+        else:
+            out.append(
+                f"RESOLUTION: {here}% of wall area is finer than this nozzle can draw. A "
+                f"{best} mm nozzle brings it under {nf['resolvable_threshold_pct']}% ({ladder}) "
+                "— but check its volumetric flow limit against the part's volume before "
+                "committing, since a finer nozzle buys detail with time"
+            )
     for kind, noun, fix in (
         # "groove wall", not "groove": both sides of a slot are probed, so the
         # figure is the wall area bounding the feature, about twice the area of

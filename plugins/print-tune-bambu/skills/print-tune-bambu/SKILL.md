@@ -21,12 +21,25 @@ Do not skip this — a settings answer with the wrong material in it is worse
 than no answer, because it looks authoritative.
 
 1. **Printer and nozzle.** Default to the **Bambu Lab H2D with a 0.4 mm nozzle**
-   unless told otherwise. If the part is abrasive-filled (CF/GF), confirm a
-   hardened nozzle is fitted.
+   unless told otherwise. If the part is abrasive-filled (CF/GF, and most matte
+   or metal-fill blends), confirm a hardened nozzle is fitted. Do not treat the
+   nozzle as fixed just because it is what is installed: `inspect_model.py`
+   measures whether it can resolve this model at all, and reports the answer as
+   `pct_failing_by_nozzle`. **Say so when it cannot** — that finding outranks
+   every setting in the brief, because no setting recovers geometry the nozzle
+   cannot draw.
 2. **Filament — always confirm this, never infer it.** "PETG" and "PETG-CF" want
    different walls, different support gaps, and a different nozzle. If the user
    has not named the exact spool, ask. This is a standing instruction from the
    user of this skill, not a nicety.
+
+   Then check the named spool is right for the job rather than accepting it. A
+   part that will sit in a car does not want PLA whatever the user loaded, and a
+   part under months of constant load does not want it either — PLA creeps at
+   room temperature. `references/material-and-nozzle-selection.md` picks both
+   filament and nozzle from what the part must survive and what the model's
+   geometry demands, and prices the flow-against-resolution trade that makes
+   "just use a smaller nozzle" an expensive sentence.
 3. **What the part has to survive.** Load direction, temperature, UV, water,
    fit tolerance, whether a visible face matters. This is the entire basis for
    every deviation from stock.
@@ -281,6 +294,9 @@ before handing the preset over.
   example, the full H2D per-variant slot table, and the validate/install commands.
 - `references/failure-modes.md` — symptom or requirement → the lever that fixes
   it, and why. Read this for anything beyond layer height and walls.
+- `references/material-and-nozzle-selection.md` — choosing the filament from what
+  the part must survive and the nozzle from what the model's finest features
+  demand, plus the volumetric-flow arithmetic that prices a finer nozzle in hours.
 - `references/settings-map.md` — Bambu Studio UI label ↔ JSON key, grouped by
   the page it lives on. Read this when writing a preset or telling someone where
   to click.
