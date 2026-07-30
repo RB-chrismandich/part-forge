@@ -443,7 +443,11 @@ def _presets(args) -> tuple[Path | None, Path | None, Path | None]:
 
 
 def cmd_check(args) -> None:
-    model = Path(args.model).expanduser()
+    # resolve(), not just expanduser(): the CLI runs from a scratch dir under
+    # $HOME, so a relative path that was valid when you typed it resolves against
+    # the wrong directory there and comes back as "The input files to the slicer
+    # are not found" -- which reads like a missing model, not a path problem.
+    model = Path(args.model).expanduser().resolve()
     if not model.is_file():
         die(f"no such model: {model}")
     machine, process, filament = _presets(args)
@@ -464,7 +468,7 @@ def cmd_check(args) -> None:
 
 
 def cmd_compare(args) -> None:
-    model = Path(args.model).expanduser()
+    model = Path(args.model).expanduser().resolve()  # see cmd_check
     if not model.is_file():
         die(f"no such model: {model}")
     machine, _, filament = _presets(args)
