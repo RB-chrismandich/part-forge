@@ -300,6 +300,278 @@ fi
 #     other is what makes the agreement evidence rather than tautology.
 # --------------------------------------------------------------------------- #
 echo
+echo "narrow features"
+
+# --------------------------------------------------------------------------- #
+#     A ladder of pillars whose every gap and wall width is CHOSEN, so the
+#     detector is checked against arithmetic rather than against another
+#     estimate. The second assertion is the one that matters most: an X-shear
+#     proportional to Z changes every 3D distance in the mesh and no in-plane
+#     one, and the slicer only ever sees the in-plane width. A future
+#     "optimisation" to a 3D nearest-surface query would still pass the first
+#     check and fail this one.
+# --------------------------------------------------------------------------- #
+python3 - "$PT" <<'PY'
+import struct, sys, tempfile
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+import inspect_model as im
+
+DEPTH, HEIGHT = 5.0, 20.0
+WIDTHS = [1.0, 1.0, 1.0, 0.6, 1.0, 1.0, 1.0]
+GAPS = [0.3, 0.5, 0.7, 0.9, 1.2, 2.5]
+
+
+def box(x0, x1, y0, y1, z0, z1):
+    v = [(x0, y0, z0), (x1, y0, z0), (x1, y1, z0), (x0, y1, z0),
+         (x0, y0, z1), (x1, y0, z1), (x1, y1, z1), (x0, y1, z1)]
+    f = [(0, 2, 1), (0, 3, 2), (4, 5, 6), (4, 6, 7), (0, 1, 5), (0, 5, 4),
+         (2, 3, 7), (2, 7, 6), (1, 2, 6), (1, 6, 5), (3, 0, 4), (3, 4, 7)]
+    return [(v[a], v[b], v[c]) for a, b, c in f]
+
+
+def ladder(shear=0.0):
+    tris, x = [], 0.0
+    for i, w in enumerate(WIDTHS):
+        tris += box(x, x + w, 0.0, DEPTH, 0.0, HEIGHT)
+        x += w + (GAPS[i] if i < len(GAPS) else 0.0)
+    return [tuple((p[0] + shear * p[2], p[1], p[2]) for p in t) for t in tris]
+
+
+# Exact, not approximate: the midpoint rule accounts for the full height, so a
+# gap is bounded by two faces of DEPTH x HEIGHT with no sampling shortfall. This
+# value is arithmetic about the fixture and is deliberately NOT derived the way
+# the code derives it -- an expected value computed by the same method as the
+# measurement cannot detect a bias in that method, which is how a systematic
+# n/(n+1) under-report survived the first version of this check.
+face = DEPTH * HEIGHT
+bad = []
+flat = im.analyze(ladder())["narrow_features"]
+for path, want in (
+    ("gap.min_mm", 0.3), ("gap.unresolvable_mm2", 2 * face),
+    ("gap.ragged_mm2", 4 * face), ("wall.min_mm", 0.6),
+    ("wall.ragged_mm2", 2 * face), ("wall.unresolvable_mm2", 0.0),
+):
+    k, sub = path.split(".")
+    got = flat[k][sub]
+    if got is None or abs(got - want) > max(0.02, 0.002 * want):
+        bad.append(f"{path} {got} != {want:.2f}")
+
+# Total wall area is arithmetic too: each pillar has two DEPTH x HEIGHT faces
+# and two width x HEIGHT faces. Pinning it catches a sampling change that
+# rescales everything uniformly, which the ratios above would not notice.
+want_area = sum(2 * DEPTH * HEIGHT + 2 * w * HEIGHT for w in WIDTHS)
+if abs(flat["wall_area_mm2"] - want_area) > 0.5:
+    bad.append(f"wall_area_mm2 {flat['wall_area_mm2']} != {want_area}")
+
+# Shear tilts every wall: a 1.2 mm in-plane gap drops to 0.54 mm measured
+# perpendicular. The slicer still sees 1.2, so these numbers must not move.
+tilted = im.analyze(ladder(shear=2.0))["narrow_features"]
+for k in ("gap", "wall"):
+    for sub in ("min_mm", "unresolvable_mm2", "ragged_mm2"):
+        if flat[k][sub] != tilted[k][sub]:
+            bad.append(f"shear moved {k}.{sub}: {flat[k][sub]} -> {tilted[k][sub]}")
+
+# A plain brick modelled as two overlapping boxes. There is no thin rib here --
+# a slicer unions the bodies and sees one solid -- but the buried facets face
+# each other across the overlap and read as one without a containment test.
+# The mesh is watertight, so no manifold check catches it; only the winding rule
+# does. Swept across overlaps that bracket the reporting band.
+for overlap in (0.1, 0.3, 0.6, 0.8):
+    brick = box(0, 10, 0, 10, 0, 10) + box(10 - overlap, 20 - overlap, 0, 10, 0, 10)
+    r = im.analyze(brick)
+    nf = r["narrow_features"]
+    if not r["watertight"]:
+        bad.append(f"overlap {overlap}: fixture stopped being watertight, test is void")
+    for k in ("gap", "wall"):
+        if nf[k]["unresolvable_mm2"] or nf[k]["ragged_mm2"]:
+            bad.append(
+                f"overlap {overlap}: invented {k} features "
+                f"{nf[k]['unresolvable_mm2']}/{nf[k]['ragged_mm2']} mm2 in solid material"
+            )
+
+# The harder half of the same defect: faces that are COINCIDENT rather than
+# overlapping. A 60 mm column with a 0.6 mm slot plugged everywhere except one
+# 0.6 mm tall band -- the plugs' sides sit exactly on the slot walls. Without a
+# containment test the plug's far face reads as the far wall of a full-height
+# slot and the answer comes out 100x high, over the whole column.
+def slotted(z0, z1):
+    return (box(0, 4.7, 0, 10, z0, z1) + box(5.3, 10, 0, 10, z0, z1)
+            + box(4.7, 5.3, 8, 10, z0, z1))
+
+
+merged = slotted(0, 60) + box(4.7, 5.3, 0, 8, 0, 30) + box(4.7, 5.3, 0, 8, 30.6, 60)
+g = im.analyze(merged)["narrow_features"]["gap"]
+# Truth: 2 walls x 8 mm deep x 0.6 mm tall = 9.6 mm2, at z 30.0-30.6. The
+# tolerance is one layer pitch of quantisation, not a licence for the 960 mm2
+# over z 0-60 that this reported before the winding rule went in.
+if not 6.0 <= g["ragged_mm2"] <= 14.0:
+    bad.append(f"coincident-face slot: {g['ragged_mm2']} mm2, want ~9.6")
+zr = g.get("z_range_mm") or [0, 60]
+if zr[0] < 29.0 or zr[1] > 32.0:
+    bad.append(f"coincident-face slot: z {zr}, want the band near 30.0-30.6")
+
+# Both preconditions must actually gate the numbers, or the caveat in the skill
+# is decorative. A single flipped triangle leaves the box closed, so this is not
+# reachable through the watertight check -- only the directed-edge count sees it.
+flipped = box(0, 10, 0, 10, 0, 10)
+flipped[0] = (flipped[0][0], flipped[0][2], flipped[0][1])
+rf = im.analyze(flipped)
+if rf["winding_consistent"]:
+    bad.append("a flipped triangle did not register as inconsistent winding")
+if not rf["watertight"]:
+    bad.append("flipped-triangle fixture stopped being watertight, test is void")
+if not any("not reported" in f for f in rf["flags"]):
+    bad.append("narrow features were still reported on an inconsistently wound mesh")
+if im.analyze(box(0, 10, 0, 10, 0, 10))["flipped_edges"]:
+    bad.append("a clean box reported flipped edges")
+
+if bad:
+    print("; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+check "groove and rib widths match an analytic ladder, survive shear, and are not invented inside overlapping solids" \
+      "the narrow-feature detector disagrees with arithmetic -- see stderr above"
+
+echo
+echo "slice_check gcode features"
+
+# --------------------------------------------------------------------------- #
+#     `check` and `compare` need Bambu Studio's CLI, which this harness may not
+#     have and must never require. The gcode parser behind `features` needs
+#     nothing: it is text handling, it carries the branchiest logic in the file
+#     -- relative versus absolute extrusion, G92 resets, retractions, travel
+#     moves and inline comments, each of which silently corrupts a total when
+#     mishandled -- and it is the evidence behind the "engraved detail prints
+#     ragged" diagnosis. A synthetic plate pins every branch to a known number.
+# --------------------------------------------------------------------------- #
+cat >"$TMP/plate_1.gcode" <<'GCODE'
+; HEADER_BLOCK_START
+; total layer number: 2
+; HEADER_BLOCK_END
+M83
+; CHANGE_LAYER
+; Z_HEIGHT: 0.20
+; FEATURE: Outer wall
+G1 X10 Y10 E1.0
+G1 X20 Y10 E2.0
+G1 X30 Y10 F9000 ; travel, and a comment that must not parse as E
+G1 E-0.8
+; FEATURE: Gap infill
+G1 X31 Y10 E0.5
+; CHANGE_LAYER
+; Z_HEIGHT: 0.40
+; FEATURE: Gap infill
+G1 X32 Y10 E0.25
+; FEATURE: Outer wall
+M82
+G1 X35 Y10 E2.0
+G92 E0
+G1 X40 Y10 E3.0
+G1 X50 Y10 E4.5
+GCODE
+
+expect_exit 0 "features reads a plate from its directory" \
+    python3 "$PT/slice_check.py" features "$TMP"
+
+python3 - "$PT" "$TMP/plate_1.gcode" <<'PY'
+import sys
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+import slice_check as sc
+
+f = sc.gcode_features(Path(sys.argv[2]))
+bad = []
+
+
+def want(name, key, exp):
+    got = f.get(name, {}).get(key)
+    if got is None or abs(got - exp) > 1e-6:
+        bad.append(f"{name}.{key} {got} != {exp}")
+
+
+# Outer wall: 1.0 + 2.0 relative; then absolute 2.0, a G92 that rezeroes the
+# datum, then 3.0 and (4.5 - 3.0). The absolute run before the G92 is what makes
+# the reset load-bearing -- without it last_e is already 0 and dropping the
+# reset changes nothing, so the branch would be asserted but never exercised.
+# The -0.8 retraction and the E-less travel must contribute nothing.
+want("Outer wall", "mm", 9.5)
+want("Gap infill", "mm", 0.75)
+want("Outer wall", "blocks", 2)
+want("Gap infill", "blocks", 2)
+# z comes from ; Z_HEIGHT:, and both features span both layers.
+want("Outer wall", "z_min", 0.20)
+want("Outer wall", "z_max", 0.40)
+want("Gap infill", "z_min", 0.20)
+want("Gap infill", "z_max", 0.40)
+if set(f) != {"Outer wall", "Gap infill"}:
+    bad.append(f"unexpected features: {sorted(f)}")
+# Gap infill is the whole point of the subcommand; if it ever stops being
+# flagged, the diagnosis it supports goes quiet rather than wrong.
+if "Gap infill" not in sc.DETAIL_RISK:
+    bad.append("Gap infill dropped out of DETAIL_RISK")
+if bad:
+    print("; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+check "extrusion, blocks and z survive M82/M83, G92, retraction and comments" \
+      "the feature parser miscounts -- see stderr above"
+
+# `check` and `compare` need Bambu Studio's CLI and so cannot run here, but the
+# reporting logic between the slicer and the reader is pure and is where the
+# diagnostic surfacing lives. Gap infill is seconds of work and the whole
+# diagnosis for ragged narrow detail, so it must appear even though ranking by
+# time buries it -- that is the behaviour, not an incidental of the formatting.
+python3 - "$PT" <<'PY'
+import io, sys
+from contextlib import redirect_stdout
+
+sys.path.insert(0, sys.argv[1])
+import slice_check as sc
+
+result = {
+    "return_code": 0, "layer_height": 0.2, "wall_loops": 2,
+    "sparse_infill_density": 15,
+    "sliced_plates": [{
+        "total_predication": 1000.0,
+        "filaments": [{"total_used_g": 12.5}],
+        "feature_type_times": {
+            "Sparse infill": 400, "Outer wall": 300, "Inner wall": 150,
+            "Travel": 80, "Undefined": 40, "Brim": 20, "Top surface": 8,
+            "Gap infill": 1.5, "Overhang wall": 0.5,
+        },
+        "warning_message": "",
+    }],
+}
+s = sc.summarize(result)
+bad = []
+if s["grams"] != 12.5:
+    bad.append(f"grams {s['grams']} != 12.5")
+if not s["ok"] or s["seconds"] != 1000:
+    bad.append(f"ok/seconds wrong: {s['ok']}/{s['seconds']}")
+
+buf = io.StringIO()
+with redirect_stdout(buf):
+    sc.print_summary("fixture", s)
+text = buf.getvalue()
+# Ranked 8th and 9th by time, so both fall outside the top six.
+for name in ("Gap infill", "Overhang wall"):
+    if name not in text:
+        bad.append(f"{name} was buried by the top-six cut")
+    elif "(diagnostic)" not in text.split(name, 1)[1].split("\n", 1)[0]:
+        bad.append(f"{name} shown but not marked diagnostic")
+if "Sparse infill" not in text:
+    bad.append("the ordinary top-six breakdown stopped being printed")
+if bad:
+    print("; ".join(bad), file=sys.stderr)
+    sys.exit(1)
+PY
+check "diagnostic features are surfaced even when time-ranking buries them" \
+      "print_summary dropped a feature that names a defect -- see stderr above"
+
+echo
 echo "cross-plugin agreement"
 expect_exit 0 "inspect_model reads the fixture" \
     python3 "$PT/inspect_model.py" "$FIXTURE/saddle_h0.stl"

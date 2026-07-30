@@ -90,8 +90,17 @@ Lines wrap at 90 columns. Tables and fences run long and are exempt.
 The H1 is a sentence-case fragment naming the activity — "The gate that decides whether a
 solid ships" — never a title-cased noun phrase.
 
-Dashes split by depth, and the split is enforced: **em-dash `—` in `SKILL.md` and
-`agents/*.md`; ASCII `--` everywhere under `references/`, `templates/`, `examples/`.**
+Dashes split by depth: **em-dash `—` in `SKILL.md` and `agents/*.md`; ASCII `--` (and
+`-`, never `–`) everywhere under `references/`, `templates/`, `examples/`.** The ASCII
+half is enforced by `repo_check.py`'s `dash-convention`, which exempts code fences —
+those carry literal program output, and rewriting a dash there would make the sample
+disagree with the tool that printed it.
+
+This rule described itself as enforced for a while before it was. part-forge's twelve
+reference files honoured it; print-tune-bambu's eight had drifted to 130 typographic
+dashes, and nothing said so. A convention documented as enforced but unchecked is worse
+than one documented as a preference, because the prose promises a guarantee the repo
+does not keep.
 
 Tables carry legends, checklists, tolerance regimes and parameter lists. Prose carries
 reasoning. A table of prose is neither.

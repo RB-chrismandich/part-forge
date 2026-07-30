@@ -477,34 +477,45 @@ def check_plugin_root_var(root: Path, rep: Report) -> None:
 def check_readme_inventory(root: Path, rep: Report) -> None:
     """The README tables are an inventory; inventories drift.
 
-    part-forge's README lists every skill, agent and script in markdown tables.
-    A new skill that nobody adds a row for is invisible to anyone reading the
-    README, which is the only documentation an installed user has.
+    A plugin README lists every skill, agent and script in markdown tables. A new
+    skill that nobody adds a row for is invisible to anyone reading the README,
+    which is the only documentation an installed user has.
+
+    Every plugin, not just part-forge. Checking one of the two meant a script
+    could gain a subcommand, or a skill gain a reference file, on the other side
+    of the marketplace with nothing to notice -- which is exactly what happened
+    to print-tune-bambu's `slice_check.py` row.
     """
-    readme = root / "plugins" / "part-forge" / "README.md"
-    if not readme.exists():
-        rep.warn("readme-inventory", str(readme), "plugin has no README.md")
-        return
-    text = read(readme)
-    ticked = set(re.findall(r"`/?(?:part-forge:)?([\w.\-]+)`", text))
+    for plugin in sorted((root / "plugins").glob("*/")):
+        if not (plugin / ".claude-plugin" / "plugin.json").exists():
+            continue
+        readme = plugin / "README.md"
+        if not readme.exists():
+            rep.warn("readme-inventory", str(readme), "plugin has no README.md")
+            continue
+        text = read(readme)
+        ticked = set(re.findall(r"`/?(?:[\w-]+:)?([\w.\-]+)`", text))
 
-    plugin = root / "plugins" / "part-forge"
-    expected: list[tuple[str, str]] = []
-    for skill in sorted(plugin.glob("skills/*/SKILL.md")):
-        expected.append(("skill", skill.parent.name))
-    for agent in sorted(plugin.glob("agents/*.md")):
-        expected.append(("agent", agent.stem))
-    for script in sorted(plugin.glob("scripts/*.py")):
-        expected.append(("script", script.name))
+        expected: list[tuple[str, str]] = []
+        for skill in sorted(plugin.glob("skills/*/SKILL.md")):
+            expected.append(("skill", skill.parent.name))
+        for agent in sorted(plugin.glob("agents/*.md")):
+            expected.append(("agent", agent.stem))
+        for script in sorted(plugin.glob("scripts/*.py")):
+            expected.append(("script", script.name))
+        # A single-skill plugin keeps its scripts inside the skill directory
+        # rather than at plugin root; they are just as much part of the surface.
+        for script in sorted(plugin.glob("skills/*/scripts/*.py")):
+            expected.append(("script", script.name))
 
-    for kind, name in expected:
-        rep.checks_run += 1
-        if name not in ticked:
-            rep.error(
-                "readme-inventory",
-                str(readme),
-                f"{kind} {name!r} exists but is not named in the README",
-            )
+        for kind, name in expected:
+            rep.checks_run += 1
+            if name not in ticked:
+                rep.error(
+                    "readme-inventory",
+                    str(readme),
+                    f"{kind} {name!r} exists but is not named in the README",
+                )
 
     for plugin_dir in sorted((root / "plugins").iterdir()):
         if plugin_dir.is_dir() and not (plugin_dir / "README.md").exists():
@@ -513,6 +524,40 @@ def check_readme_inventory(root: Path, rep: Report) -> None:
                 str(plugin_dir),
                 "plugin has no README.md -- it is what a user sees before installing",
             )
+
+
+def check_dash_convention(root: Path, rep: Report) -> None:
+    """ASCII dashes under references/, templates/ and examples/.
+
+    `plugin-authoring` states this split as enforced, and it was not: no check
+    implemented it, and while all twelve of part-forge's reference files honoured
+    it, all eight of print-tune-bambu's had drifted to typographic dashes -- 130
+    of them. A convention documented as enforced but unchecked is worse than one
+    documented as a preference, because the prose asserts a guarantee the repo
+    does not provide.
+
+    Code fences are exempt. They carry literal program output, and rewriting a
+    dash there would make the sample disagree with the tool that printed it.
+    """
+    for md in sorted((root / "plugins").rglob("*.md")):
+        if not any(d in md.parts for d in ("references", "templates", "examples")):
+            continue
+        rep.checks_run += 1
+        fence = False
+        for lineno, line in enumerate(read(md).splitlines(), 1):
+            if line.lstrip().startswith("```"):
+                fence = not fence
+                continue
+            if fence:
+                continue
+            for ch, name, want in (("—", "em-dash", "--"), ("–", "en-dash", "-")):
+                if ch in line:
+                    rep.error(
+                        "dash-convention",
+                        f"{md}:{lineno}",
+                        f"{name} outside a code fence -- use ASCII {want!r} under "
+                        "references/, templates/ and examples/",
+                    )
 
 
 def check_python_compiles(root: Path, rep: Report) -> None:
@@ -886,6 +931,7 @@ def run(root: Path, skip_cli: bool = False) -> Report:
     check_command_skill_shape(root, rep)
     check_flag_drift(root, rep)
     check_readme_inventory(root, rep)
+    check_dash_convention(root, rep)
     check_python_compiles(root, rep)
     check_hooks(root, rep)
     check_gitignore_twin(root, rep)
